@@ -1,0 +1,10 @@
+{
+  "sourceSHA256": "20a7f80e5de0e2052071fcba6a838249437d60deb42991b42ed03f1cd955066d",
+  "totalFrames": 5168,
+  "fps": 60,
+  "maximumDrumEventDelayMS": 16.66666666666572,
+  "eventsChecked": 233,
+  "silenceSuppression": "passed",
+  "deterministicSeeks": "passed",
+  "safeAreaAndParticleBounds": "passed"
+}

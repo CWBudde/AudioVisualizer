@@ -1,0 +1,48 @@
+{
+  "model": "htdemucs",
+  "device": "cpu",
+  "seed": 42,
+  "arguments": [
+    "-n",
+    "htdemucs",
+    "--repo",
+    ".cache/models",
+    "-d",
+    "cpu",
+    "--shifts",
+    "1",
+    "--float32",
+    "--clip-mode",
+    "none",
+    "-o",
+    "analysis/stems",
+    "public/audio/PixelParade.wav"
+  ],
+  "clipMode": "none",
+  "python": "3.12.4",
+  "versions": {
+    "demucs": "4.1.0",
+    "torch": "2.10.0+cpu",
+    "numpy": "1.26.4",
+    "einops": "0.8.2",
+    "julius": "0.2.8",
+    "lameenc": "1.8.4",
+    "sphn": "0.2.1",
+    "huggingface-hub": "0.34.4",
+    "safetensors": "0.6.2",
+    "pyyaml": "6.0.2",
+    "tqdm": "4.67.3"
+  },
+  "status": "complete",
+  "elapsedSeconds": 126.682,
+  "modelFiles": [
+    {
+      "path": ".cache/models/955717e8-8726e21a.th",
+      "sha256": "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4"
+    },
+    {
+      "path": ".cache/models/htdemucs.yaml",
+      "sha256": "239c445d0b14454d541ad8bd9bb271c9e536d267e8a4625208744cbb2e7bb66c"
+    }
+  ]
+}

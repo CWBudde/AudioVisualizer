@@ -1,0 +1,14 @@
+Summary:
+
+  Integrated loudness:
+    I:         -16.3 LUFS
+    Threshold: -26.3 LUFS
+
+  Loudness range:
+    LRA:         4.4 LU
+    Threshold: -36.3 LUFS
+    LRA low:   -19.2 LUFS
+    LRA high:  -14.8 LUFS
+
+  True peak:
+    Peak:       -2.9 dBFS
