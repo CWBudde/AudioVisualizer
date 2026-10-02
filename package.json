@@ -1,0 +1,31 @@
+{
+  "name": "pixel-parade-visualizer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "analyze": "sh scripts/go.sh run ./cmd/analyze && sh scripts/go.sh run ./cmd/controls",
+    "typecheck": "tsc --noEmit",
+    "validate": "bun scripts/validate.ts",
+    "preflight": "bun build scripts/preflight.ts --target=node --packages=external --outfile=.cache/preflight.mjs && node .cache/preflight.mjs",
+    "render:stills": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs stills",
+    "render:preview": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs preview",
+    "render": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs master"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.532",
+    "@remotion/cli": "4.0.532",
+    "@remotion/media": "4.0.532",
+    "@remotion/renderer": "4.0.532",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.532"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.10",
+    "@types/react": "19.2.0",
+    "@types/react-dom": "19.2.0",
+    "typescript": "5.9.3"
+  }
+}
