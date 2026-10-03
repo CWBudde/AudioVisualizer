@@ -1,0 +1,40 @@
+{
+  "videoFormat": "1080x1080 / 60 fps / 5168 frames / H.264 / yuv420p / AAC stereo 48kHz",
+  "fastStart": true,
+  "sourceSeconds": 86.12,
+  "decodedAudioSeconds": 86.12,
+  "audioComparisons": [
+    {
+      "startSeconds": 2,
+      "endSeconds": 12,
+      "bestLagMS": 0,
+      "correlation": 0.9998703761577623,
+      "gainDB": -0.01818663146563939
+    },
+    {
+      "startSeconds": 35,
+      "endSeconds": 45,
+      "bestLagMS": 0,
+      "correlation": 0.9998830001854706,
+      "gainDB": -0.014200887347949219
+    },
+    {
+      "startSeconds": 72,
+      "endSeconds": 82,
+      "bestLagMS": 0,
+      "correlation": 0.9998661944261557,
+      "gainDB": -0.014981002515741863
+    },
+    {
+      "startSeconds": 82.3,
+      "endSeconds": 86.12,
+      "bestLagMS": 0,
+      "correlation": 0.9999908454377094,
+      "gainDB": -0.004298692422384641
+    }
+  ],
+  "fullDecode": "passed",
+  "maximumFrameClockErrorMS": 0.0003333333467026023,
+  "waveformComparisonSampleRate": 24000,
+  "wholeFileGainDB": -0.013345278258135806
+}

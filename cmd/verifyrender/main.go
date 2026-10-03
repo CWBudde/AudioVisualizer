@@ -117,7 +117,7 @@ func fastStart(path string) (bool, error) {
 func version() (string, error) {
 	v := os.Getenv("PP_VERSION")
 	if v == "" {
-		v = "v2"
+		v = "v3"
 	}
 	if !regexp.MustCompile(`^v[0-9]+$`).MatchString(v) {
 		return "", fmt.Errorf("invalid PP_VERSION %q", v)
