@@ -40,7 +40,7 @@ try {
       let lastLog = 0;
       console.log(`Rendering ${output} (${clip.range[1] - clip.range[0] + 1} frames)`);
       const start = Date.now();
-      await renderMedia({...common, outputLocation: output, codec: 'h264', pixelFormat: 'yuv420p', crf: 18,
+      await renderMedia({...common, outputLocation: output, codec: 'h264', pixelFormat: 'yuv420p', colorSpace: 'bt709', crf: 18, x264Preset: 'fast',
         audioCodec: 'aac', audioBitrate: '320k', concurrency: 2,
         frameRange: [clip.range[0], clip.range[1]],
         onProgress: p => {if (Date.now() - lastLog > 10000) {console.log(`${clip.name}: ${p.renderedFrames} rendered, ${p.encodedFrames} encoded, ${(p.progress * 100).toFixed(1)}%`); lastLog = Date.now();}},

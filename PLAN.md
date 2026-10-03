@@ -1,12 +1,12 @@
 # PixelParade — music visualizer production plan
 
-Prepared 2026-10-03. **Preparation is complete. Visual implementation and rendering are the next, separate milestone.**
+Prepared 2026-10-03. **Preparation and visual implementation are complete. Four preview clips have been reviewed; the full master is rendering.**
 
 ## 1. Deliverable and creative direction
 
 Create a full-track **1080×1080, 60 fps MP4** using Remotion motion design. The chosen direction is a **neon geometric parade with no text**: luminous diamonds, squares, rings, and ribbons assemble, travel through depth, disperse during breakdowns, and return in a fuller finale. The source soundtrack stays at its original timing and gain.
 
-The current requested milestone ends with copied audio, local stems, reproducible Go analysis, and this plan. No Remotion scene, production preview, or MP4 has been created yet.
+The initial preparation milestone ended with copied audio, local stems, reproducible Go analysis, and this plan. The subsequent continuation implements the Remotion composition and renders the MP4.
 
 ### Completed artifacts
 
@@ -175,7 +175,28 @@ The full analysis JSON is about 24 MB because it includes five spectrograms. Bef
 
 Go runtime: 1.26.1. The four algorithm repositories are clean. `wav` has existing changes in `.golangci.toml` and `cmd/wavtagger/main.go`; these are outside the imported decoder package and were left untouched. The runtime provenance records that dirty state.
 
-## 5. Next milestone: Remotion build and render
+## 5. Implemented Remotion build and render
+
+The source is in `src/`: pure controls and choreography, SVG background/formations/ribbons/impact rings/core, Canvas sparks, and the registered `PixelParadeSquare` composition. `cmd/controls` exports the compact 3.0 MB public timeline without changing measured values. Bun dependencies are pinned and locked in `bun.lock`; orchestration scripts are compiled by Bun and executed with Node.
+
+The Linux browser preflight passed with Remotion's Chrome Headless Shell 149.0.7790.0 downloaded from its official distribution. The previous native Chrome sandbox failure is resolved for this renderer. Rendering uses two workers, H.264 CRF 18 with the `fast` x264 preset, explicit BT.709 limited range, stereo AAC at 320 kbps, and a lossless fast-start remux. The `fast` preset reduces software encoding cost on the busy host. Initial previews use full-range YUV; the master explicitly corrects that to `yuv420p` with BT.709.
+
+Twenty scene frames were captured at full resolution and reviewed in `out/storyboard.jpg`. Three actual captured PNGs matched SHA-256 hashes when re-rendered in a different order; see `analysis/frame-determinism.json`. All 233 drum events respond by the first frame after their timestamps (maximum delay 16.67 ms); both measured pauses suppress impacts and sparks. Geometry bounds, particle limits, schema/source identity, exact exported controls, and pure seek behavior pass `scripts/validate.ts` and are recorded in `analysis/visual-validation.json`.
+
+The four full-resolution previews are in `out/previews/`: `01-opening.mp4`, `02-breakdown-return.mp4`, `03-finale-entrance.mp4`, and `04-ending.mp4`. Their dimensions, frame counts, frame rates, and audio formats pass `scripts/inspect-previews.ts`; the probe records are in `analysis/preview-validation.json`. Encoded opening, breakdown, finale, and ending frames were visually inspected. One interrupted preview job was resumed; all four clips completed successfully.
+
+Production commands:
+
+```sh
+rtk proxy bun run typecheck
+rtk proxy bun run validate
+rtk proxy bun run render:stills
+rtk proxy bun run render:preview
+rtk proxy bun run render
+rtk proxy sh scripts/go.sh run ./cmd/verifyrender
+```
+
+`cmd/verifyrender` checks the master stream format, 5168 frames, fast-start MP4 boxes, complete decode, audio duration, and beginning/middle/end/tail waveform correlation, gain, and lag against the original WAV. It writes `analysis/render-probe.json` and `analysis/render-validation.json`.
 
 ### Runtime and architecture
 
@@ -216,7 +237,7 @@ Ensure fast start through the supported renderer configuration or a final lossle
 
 Direct Python/Go/npm DNS access is restricted in this execution environment, while curl and package installation successfully reached their respective sources. The official model was downloaded with curl and loaded through a local model repository. An npm metadata query failed; curl retrieved the registry metadata successfully.
 
-Native Chrome screenshot attempts failed with sandbox socket/shutdown restrictions, even with `--no-sandbox`. The HTML's JavaScript syntax was checked with Node, and the independent PNG was rendered and visually inspected. Browser playback/interaction has not been verified here. Before motion implementation, run a minimal Remotion composition/render preflight in a browser-capable execution environment. This is a concrete unresolved rendering constraint, not a missing scene-design decision.
+Native Chrome screenshot attempts failed during preparation with sandbox socket/shutdown restrictions. The Remotion continuation resolved video rendering by using its official Chrome Headless Shell with the Node renderer; the minimal composition preflight and subsequent production captures passed. The diagnostic HTML's JavaScript syntax and independent PNG were checked during preparation; interactive playback on that inspection page remains unaudited.
 
 ## 6. Verification and acceptance
 
@@ -236,12 +257,12 @@ Native Chrome screenshot attempts failed with sandbox socket/shutdown restrictio
 
 ### Acceptance for the next milestone
 
-- [ ] Minimal browser/render preflight succeeds before expensive scene work.
-- [ ] TypeScript checks and compact-control schema/source validation pass.
-- [ ] Repeated and out-of-order renders of selected frames are identical.
-- [ ] Representative clips align impacts with validated events within one 60 fps frame; measured pauses suppress emission and impulses.
-- [ ] Opening, two breakdowns, returns, finale, and ending have visibly distinct choreography.
-- [ ] No text appears; central geometry stays legible and the finale earns its higher density.
+- [x] Minimal browser/render preflight succeeds before expensive scene work.
+- [x] TypeScript checks and compact-control schema/source validation pass.
+- [x] Repeated and out-of-order renders of selected frames are identical.
+- [x] Representative clips align impacts with validated events within one 60 fps frame; measured pauses suppress emission and impulses.
+- [x] Opening, two breakdowns, returns, finale, and ending have visibly distinct choreography.
+- [x] No text appears; central geometry stays legible and the finale earns its higher density.
 - [ ] Full master contains the complete soundtrack at original timing/gain and no unexplained blank frames or missing assets.
 - [ ] FFprobe verifies 1080×1080, 60 fps, 5168 frames, H.264, `yuv420p`, and stereo AAC.
 - [ ] Final review checks sync at beginning/middle/end, transition continuity, clipping at canvas edges, neon compression quality, and the last frame.
