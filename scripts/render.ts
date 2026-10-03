@@ -1,5 +1,5 @@
 import {bundle} from '@remotion/bundler';
-import {openBrowser, renderMedia, renderStill, selectComposition} from '@remotion/renderer';
+import {ensureBrowser, openBrowser, renderMedia, renderStill, selectComposition} from '@remotion/renderer';
 import {mkdir, readFile, writeFile, rename} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -12,12 +12,20 @@ await mkdir('out/stills', {recursive: true});
 let progress = -1;
 console.log('Bundling PixelParade…');
 const serveUrl = await bundle({entryPoint: 'src/index.ts', outDir: resolve('.cache/remotion-bundle'), onProgress: p => {const bucket = Math.floor(p / 25); if (bucket > progress) {console.log(`Bundle ${p}%`); progress = bucket;}}});
-const browser = await openBrowser('chrome', {browserExecutable: resolve('.cache/browser/chrome-headless-shell-linux64/chrome-headless-shell'), logLevel: 'info'});
+await ensureBrowser();
+// The scene is WebGL2; ANGLE gives headless Chrome a GPU-backed context on macOS and Linux.
+const chromiumOptions = {gl: 'angle'} as const;
+const browser = await openBrowser('chrome', {logLevel: 'info', chromiumOptions});
 try {
-  const composition = await selectComposition({serveUrl, id: 'PixelParadeSquare', puppeteerInstance: browser});
-  const common = {serveUrl, composition, puppeteerInstance: browser};
-  if (mode === 'stills') {
-    const frames = [0, 180, 525, 550, 1083, 1099, 1646, 2196, 2400, 2664, 2850, 3294, 3720, 3840, 3900, 4388, 4620, 4938, 5100, 5167];
+  const composition = await selectComposition({serveUrl, id: 'PixelParadeSquare', puppeteerInstance: browser, chromiumOptions});
+  const common = {serveUrl, composition, puppeteerInstance: browser, chromiumOptions};
+  // `stills 540 1200` renders just those frames for quick look-dev, without the determinism check.
+  const requested = process.argv.slice(3).map(Number);
+  if (mode === 'stills' && requested.length) {
+    for (const frame of requested) {console.log(`Still ${frame} (${(frame / 60).toFixed(2)}s)`); await renderStill({...common, frame, output: `out/stills/${String(frame).padStart(4, '0')}.png`});}
+  } else if (mode === 'stills') {
+    // Cue edges and in-cue changes: 0, 8.75, 9.17, 18.05, 18.31, 27.43, 36.6, 44.4, 45.7, 54.9, 62.3, 64, 73.14, 82.3, end.
+    const frames = [0, 180, 525, 550, 720, 1083, 1099, 1646, 1800, 2196, 2400, 2664, 2742, 2850, 3294, 3738, 3840, 3900, 4388, 4620, 4938, 5100, 5167];
     for (const frame of frames) {console.log(`Still ${frame} (${(frame / 60).toFixed(2)}s)`); await renderStill({...common, frame, output: `out/stills/${String(frame).padStart(4, '0')}.png`});}
     const hashes: Record<string, string> = {};
     // Render in a different order, compare actual captured pixels, not just poses.

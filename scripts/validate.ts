@@ -2,7 +2,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import {assertAnalysis, getAudioControls, SOURCE_HASH} from '../src/controls';
-import {sceneAt, sparksAt, tokenPose} from '../src/choreography';
+import {frameUniforms} from '../src/gl/uniforms';
 import type {Analysis} from '../src/types';
 
 const a: Analysis = JSON.parse(await readFile('public/analysis/controls.json', 'utf8'));
@@ -12,33 +12,45 @@ assert.equal(createHash('sha256').update(source).digest('hex'), SOURCE_HASH, 'Au
 const full = JSON.parse(await readFile('analysis/features.json', 'utf8'));
 assert.deepEqual(a.cues, full.cues);
 assert.deepEqual(a.rhythm, full.rhythm);
-for (const [name, track] of Object.entries(a.tracks)) for (const key of ['source', 'energyControl', 'bandControls', 'centroidHz', 'stereoWidth', 'onsets']) {
+for (const [name, track] of Object.entries(a.tracks)) for (const key of ['source', 'energyControl', 'bandControls', 'centroidHz', 'stereoWidth', 'onsets', 'melody']) {
   assert.deepEqual(track[key as keyof typeof track], full.tracks[name][key], `Export changed ${name}/${key}`);
 }
-// Each recorded drum event becomes visible at the first frame after its timestamp.
+// Each recorded drum event becomes visible at the first frame after its timestamp, in its own kind's impulse too.
 let maximumTimingError = 0;
 for (const e of a.tracks.drums.onsets) {
-  const frame = Math.ceil(e.timeSeconds * 60), t = frame / 60;
+  const frame = Math.ceil(e.timeSeconds * 60), t = frame / 60, c = getAudioControls(a, t);
   maximumTimingError = Math.max(maximumTimingError, t - e.timeSeconds);
-  assert.ok(getAudioControls(a, t).impact >= e.strength * Math.exp(-(t - e.timeSeconds) / .12) - 1e-9);
+  assert.ok(c.impact >= e.strength * Math.exp(-(t - e.timeSeconds) / .12) - 1e-9);
+  assert.ok(c[e.kind as 'kick' | 'snare' | 'hat'] > 0, `No ${e.kind} response at ${t}`);
 }
+// Each melody note flares at the first frame after its start.
+let maximumNoteError = 0;
+for (const note of a.tracks.other.melody!.notes) {
+  const t = Math.ceil(note.startSeconds * 60) / 60;
+  const shown = getAudioControls(a, t).notes.some(n => Math.abs(n.startAge - (t - note.startSeconds)) < 1e-9);
+  assert.ok(shown, `Note at ${note.startSeconds} missing from frame ${t * 60}`);
+  maximumNoteError = Math.max(maximumNoteError, t - note.startSeconds);
+}
+// Measured pauses: no drum impulses and no new note flares.
 for (const gap of a.silence) for (let t = gap.startSeconds; t < gap.endSeconds; t += 1 / 60) {
   const c = getAudioControls(a, t);
-  assert.equal(c.impact, 0);
-  assert.equal(sparksAt(a, t, c, sceneAt(a, c, t)).length, 0);
+  assert.deepEqual([c.impact, c.kick, c.snare, c.hat], [0, 0, 0, 0], `Impulse inside pause at ${t}`);
+  assert.ok(c.notes.every(n => t - n.startAge < gap.startSeconds), `Note starts inside pause at ${t}`);
 }
-// Pure pose functions must produce identical results after arbitrary seeks.
-const times = [0, 8.75, 9.17, 18.05, 18.31, 27.43, 36.6, 44.4, 54.9, 64, 73.14, 82.3, 86.116667];
-const poseAt = (t: number) => {const c = getAudioControls(a, t), scene = sceneAt(a, c, t); return {c, scene, tokens: Array.from({length: 80}, (_, id) => tokenPose(a, id, t, c, scene)), sparks: sparksAt(a, t, c, scene)};};
-const baseline = times.map(poseAt);
-for (const i of [12, 2, 7, 0, 10, 1, 6, 3, 8, 5, 4, 11, 9]) assert.deepEqual(poseAt(times[i]), baseline[i]);
+// Frames must be pure functions of time: identical after arbitrary out-of-order seeks.
+const times = [0, 8.75, 9.17, 18.05, 18.31, 27.43, 36.6, 44.4, 45.7, 54.9, 62.3, 64, 73.14, 82.3, 86.116667];
+const at = (t: number) => frameUniforms(a, t, Math.round(t * 60));
+const baseline = times.map(at);
+for (const i of [14, 2, 7, 0, 10, 1, 6, 3, 8, 13, 5, 4, 11, 9, 12]) assert.deepEqual(at(times[i]), baseline[i]);
 for (let frame = 0; frame < 5168; frame += 3) {
-  const t = frame / 60, state = poseAt(t);
-  for (const p of state.tokens) {
-    assert.ok(Object.values(p).every(Number.isFinite));
-    assert.ok(Math.abs(p.x) + p.size < 432 && Math.abs(p.y) + p.size < 432, `Token outside safe area at ${t}`);
-  }
-  assert.ok(state.sparks.length <= 240);
+  const u = at(frame / 60);
+  for (const [name, value] of Object.entries({...u.scene, ...u.post})) assert.ok(Number.isFinite(value), `${name} not finite at frame ${frame}`);
+  assert.ok([...u.notes, ...u.noteHue].every(Number.isFinite), `Note uniforms not finite at frame ${frame}`);
 }
-await writeFile('analysis/visual-validation.json', JSON.stringify({sourceSHA256: SOURCE_HASH, totalFrames: 5168, fps: 60, maximumDrumEventDelayMS: maximumTimingError * 1000, eventsChecked: a.tracks.drums.onsets.length, silenceSuppression: 'passed', deterministicSeeks: 'passed', safeAreaAndParticleBounds: 'passed'}, null, 2));
-console.log(`Source/schema/export, deterministic poses, safe area and pauses passed. ${a.tracks.drums.onsets.length} drum events within ${(maximumTimingError * 1000).toFixed(2)} ms.`);
+await writeFile('analysis/visual-validation.json', JSON.stringify({
+  sourceSHA256: SOURCE_HASH, totalFrames: 5168, fps: 60,
+  maximumDrumEventDelayMS: maximumTimingError * 1000, maximumNoteDelayMS: maximumNoteError * 1000,
+  eventsChecked: a.tracks.drums.onsets.length, notesChecked: a.tracks.other.melody!.notes.length,
+  silenceSuppression: 'passed', deterministicSeeks: 'passed', finiteUniforms: 'passed',
+}, null, 2) + '\n');
+console.log(`Source/schema/export, deterministic seeks, finite uniforms and pauses passed. ${a.tracks.drums.onsets.length} drum events within ${(maximumTimingError * 1000).toFixed(2)} ms, ${a.tracks.other.melody!.notes.length} notes within ${(maximumNoteError * 1000).toFixed(2)} ms.`);

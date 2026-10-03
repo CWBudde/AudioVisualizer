@@ -34,12 +34,12 @@ for ax, name in zip(axes[:5], ["mix", "drums", "bass", "other", "vocals"]):
     for cue in data["cues"]:
         ax.axvline(cue["startSeconds"], color="#596a89", linewidth=.6, alpha=.7)
 mix = tracks["mix"]
-spectrum = np.asarray(mix["spectrogramDB"]).reshape(-1, 64).T
+spectrum = np.asarray(mix["spectrogramDB"]).reshape(-1, data["spectrogramBins"]).T
 axes[-1].imshow(spectrum, origin="lower", aspect="auto", cmap="magma", vmin=-75, vmax=-10,
-                extent=[0, duration, 0, 64], interpolation="nearest")
-frequencies = np.array([25, 140, 400, 2000, 6000, 12000])
-axes[-1].set_yticks(np.log(frequencies / 25) / np.log(12000 / 25) * 64,
-                   ["25", "140", "400", "2k", "6k", "12k"])
+                extent=[0, duration, 0, data["spectrogramBins"]], interpolation="nearest")
+rows = np.arange(0, len(data["spectrogramBinHz"]), 8)
+axes[-1].set_yticks(rows + .5, [f"{hz:.0f}" if hz < 1000 else f"{hz / 1000:.1f}k"
+                                for hz in np.asarray(data["spectrogramBinHz"])[rows]])
 axes[-1].set_ylabel("Mix spectrum\nHz (log)")
 axes[-1].set_xlabel("Time (seconds)")
 axes[-1].set_xlim(0, duration)

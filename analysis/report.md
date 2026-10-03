@@ -16,7 +16,7 @@ Estimated tempo: **105.000 BPM**. Beat origin: **0.038 s**. Quarter-note period:
 
 Refined explicit 105.0 BPM mix-analysis prior using multibeat spectral-novelty correlation 0.6218; phase fitted to low-band drum attacks.
 
-Meter: 4/4 inferred from ~9.14 s phrase changes; downbeat index unverified. Median detected-onset distance to the nearest sixteenth-note subdivision: 8.00 ms. This metric measures grid fit, not detection accuracy or downbeat certainty.
+Meter: 4/4; downbeat at beat index 0 from kick/bass attack accents. Median detected-onset distance to the nearest sixteenth-note subdivision: 8.00 ms. This metric measures grid fit, not detection accuracy or downbeat certainty.
 
 | Alternative BPM | Correlation |
 |---:|---:|

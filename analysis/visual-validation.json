@@ -3,8 +3,10 @@
   "totalFrames": 5168,
   "fps": 60,
   "maximumDrumEventDelayMS": 16.66666666666572,
+  "maximumNoteDelayMS": 16.66666666666572,
   "eventsChecked": 233,
+  "notesChecked": 515,
   "silenceSuppression": "passed",
   "deterministicSeeks": "passed",
-  "safeAreaAndParticleBounds": "passed"
+  "finiteUniforms": "passed"
 }

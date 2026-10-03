@@ -50,9 +50,12 @@ func stats(a, b *audioanalysis.Audio, start, end, lag int) (float64, float64) {
 	}
 	return ab / math.Sqrt(aa*bb), 10 * math.Log10(bb/aa)
 }
+
+// compare works on loaded channels, which Load resamples to the analysis rate,
+// not the file's original Source.SampleRate.
 func compare(a, b *audioanalysis.Audio, start, end float64) window {
-	// Load aligns channel data at the analysis rate; source metadata retains 48kHz.
-	i, j := int(start*float64(audioanalysis.SampleRate)), int(end*float64(audioanalysis.SampleRate))
+	rate := float64(audioanalysis.SampleRate)
+	i, j := int(start*rate), min(int(end*rate), len(a.Channels[0]))
 	best, lag := -1.0, 0
 	for offset := -480; offset <= 480; offset += 16 {
 		c, _ := stats(a, b, i, j, offset)
@@ -68,7 +71,7 @@ func compare(a, b *audioanalysis.Audio, start, end float64) window {
 		}
 	}
 	c, gain := stats(a, b, i, j, lag)
-	return window{start, end, float64(lag) * 1000 / float64(audioanalysis.SampleRate), c, gain}
+	return window{start, end, float64(lag) * 1000 / rate, c, gain}
 }
 
 // Parse top-level ISO BMFF boxes rather than looking for strings in compressed data.

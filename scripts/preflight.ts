@@ -1,13 +1,14 @@
 import {bundle} from '@remotion/bundler';
-import {openBrowser, selectComposition, renderStill} from '@remotion/renderer';
+import {ensureBrowser, openBrowser, selectComposition, renderStill} from '@remotion/renderer';
 import {mkdir} from 'node:fs/promises';
-import {resolve} from 'node:path';
 
 await mkdir('out', {recursive: true});
-const browser = await openBrowser('chrome', {logLevel: 'verbose', browserExecutable: resolve('.cache/browser/chrome-headless-shell-linux64/chrome-headless-shell')});
+await ensureBrowser();
+const chromiumOptions = {gl: 'angle'} as const;
+const browser = await openBrowser('chrome', {logLevel: 'verbose', chromiumOptions});
 try {
   const serveUrl = await bundle({entryPoint: 'src/preflight.tsx'});
-  const composition = await selectComposition({serveUrl, id: 'Preflight', puppeteerInstance: browser});
-  await renderStill({serveUrl, composition, output: 'out/preflight.png', puppeteerInstance: browser});
-  console.log('Browser and Remotion frame capture passed.');
+  const composition = await selectComposition({serveUrl, id: 'Preflight', puppeteerInstance: browser, chromiumOptions});
+  await renderStill({serveUrl, composition, frame: 15, output: 'out/preflight.png', puppeteerInstance: browser, chromiumOptions});
+  console.log('Browser, WebGL2 and Remotion frame capture passed.');
 } finally { await browser.close({silent: true}); }

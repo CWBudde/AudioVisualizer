@@ -19,10 +19,10 @@
     "public/audio/PixelParade.wav"
   ],
   "clipMode": "none",
-  "python": "3.12.4",
+  "python": "3.12.14",
   "versions": {
     "demucs": "4.1.0",
-    "torch": "2.10.0+cpu",
+    "torch": "2.10.0",
     "numpy": "1.26.4",
     "einops": "0.8.2",
     "julius": "0.2.8",
@@ -34,7 +34,7 @@
     "tqdm": "4.67.3"
   },
   "status": "complete",
-  "elapsedSeconds": 126.682,
+  "elapsedSeconds": 16.509,
   "modelFiles": [
     {
       "path": ".cache/models/955717e8-8726e21a.th",

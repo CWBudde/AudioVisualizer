@@ -8,11 +8,12 @@ import (
 	"math"
 	"os"
 
+	"github.com/cwbudde/algo-dsp/dsp/core"
 	"github.com/cwbudde/algo-dsp/dsp/resample"
 	"github.com/cwbudde/wav"
 )
 
-func DB(v float64) float64 { return 20 * math.Log10(math.Max(v, 1e-6)) }
+func DB(v float64) float64 { return core.LinearToDBFloor(v, 1e-6) }
 
 func Load(path string) (*Audio, error) {
 	f, err := os.Open(path)
@@ -81,30 +82,5 @@ func (b *bufferedSeeker) Seek(offset int64, whence int) (int64, error) {
 // ResampleAligned flushes the causal FIR tail and compensates fractional group
 // delay so both 48 kHz mix and 44.1 kHz stems share an exact t=0 origin.
 func ResampleAligned(x []float64, inputRate, outputRate int) ([]float64, error) {
-	if inputRate <= 0 || outputRate <= 0 {
-		return nil, fmt.Errorf("invalid sample rate")
-	}
-	if inputRate == outputRate {
-		return append([]float64(nil), x...), nil
-	}
-	r, err := resample.NewForRates(float64(inputRate), float64(outputRate), resample.WithQuality(resample.QualityBest))
-	if err != nil {
-		return nil, err
-	}
-	up, down := r.Ratio()
-	delayInput := float64(len(r.Prototype())-1) / (2 * float64(up))
-	delayOutput := float64(len(r.Prototype())-1) / (2 * float64(down))
-	padded := make([]float64, len(x)+int(math.Ceil(delayInput))+4)
-	copy(padded, x)
-	raw := r.Process(padded)
-	y := make([]float64, int(math.Round(float64(len(x))*float64(outputRate)/float64(inputRate))))
-	for i := range y {
-		pos := float64(i) + delayOutput
-		j := int(pos)
-		u := pos - float64(j)
-		if j+1 < len(raw) {
-			y[i] = raw[j]*(1-u) + raw[j+1]*u
-		}
-	}
-	return y, nil
+	return resample.ResampleAligned(x, float64(inputRate), float64(outputRate), resample.WithQuality(resample.QualityBest))
 }

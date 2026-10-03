@@ -147,11 +147,17 @@ func TestSilenceFiniteAndNoTriggers(t *testing.T) {
 			t.Fatal("silent controls nonzero")
 		}
 	}
-	intervals := FindSilence(a)
+	intervals, err := FindSilence(a)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(intervals) != 1 || intervals[0].End != 1 {
 		t.Fatalf("silence intervals: %+v", intervals)
 	}
-	r := EstimateRhythm(track, 105)
+	r, err := EstimateRhythm(track, 105)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if r.BPM != 0 || len(r.Beats) != 0 {
 		t.Fatal("invented tempo for silence")
 	}
@@ -192,9 +198,12 @@ func TestTempoRecoversKnownPulseTrain(t *testing.T) {
 	for i := 10; i < 2000; i += 50 {
 		track.Flux[i] = 1
 		track.Bands[0][i] = 1
-		track.Events = append(track.Events, Event{float64(i) * 0.01, 1})
+		track.Events = append(track.Events, Event{Time: float64(i) * 0.01, Strength: 1})
 	}
-	r := EstimateRhythm(track, 120)
+	r, err := EstimateRhythm(track, 120)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if math.Abs(r.BPM-120) > 0.1 {
 		t.Fatalf("tempo %.3f", r.BPM)
 	}

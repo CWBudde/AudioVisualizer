@@ -4,6 +4,15 @@ const SampleRate = 24000
 const FFTSize = 2048
 const Hop = 240
 
+// Gate is the RMS level (-80 dBFS) below which centroid, flux and controls are zero.
+const Gate = 1e-4
+
+const (
+	SpectrogramBins  = 64
+	SpectrogramMinHz = 25
+	SpectrogramMaxHz = 12000
+)
+
 var BandEdges = [6]float64{25, 140, 400, 2000, 6000, 12000}
 
 type Source struct {
@@ -22,9 +31,11 @@ type Audio struct {
 	Channels [][]float64
 }
 
+// Event kinds are spectral-shape labels (kick/snare/hat) on the drum stem only.
 type Event struct {
 	Time     float64 `json:"timeSeconds"`
 	Strength float64 `json:"strength"`
+	Kind     string  `json:"kind,omitempty"`
 }
 
 // Track arrays are centered at i*hop/sampleRate, including a padded first frame.
@@ -41,6 +52,7 @@ type Track struct {
 	BandControls [5][]float64 `json:"bandControls"`
 	Events       []Event      `json:"onsets"`
 	Spectrogram  []float64    `json:"spectrogramDB"`
+	Melody       *Melody      `json:"melody,omitempty"`
 }
 
 type TempoCandidate struct {
@@ -54,6 +66,7 @@ type Rhythm struct {
 	Meter              string           `json:"meterHypothesis"`
 	Candidates         []TempoCandidate `json:"candidates"`
 	Beats              []float64        `json:"beatsSeconds"`
+	Downbeat           int              `json:"downbeatBeatIndex"`
 	MedianOnsetErrorMS float64          `json:"medianOnsetGridErrorMS"`
 	Evidence           string           `json:"evidence"`
 }
@@ -79,16 +92,17 @@ type Alignment struct {
 }
 
 type Analysis struct {
-	SchemaVersion   int               `json:"schemaVersion"`
-	SampleRate      int               `json:"analysisSampleRate"`
-	FFTSize         int               `json:"fftSize"`
-	Hop             int               `json:"hopSamples"`
-	BandEdges       [6]float64        `json:"bandEdgesHz"`
-	SpectrogramBins int               `json:"spectrogramBins"`
-	Tracks          map[string]*Track `json:"tracks"`
-	Rhythm          Rhythm            `json:"rhythm"`
-	Silence         []Interval        `json:"silence"`
-	Cues            []Cue             `json:"cues"`
-	Alignment       *Alignment        `json:"stemAlignment,omitempty"`
-	Provenance      map[string]string `json:"provenance"`
+	SchemaVersion    int               `json:"schemaVersion"`
+	SampleRate       int               `json:"analysisSampleRate"`
+	FFTSize          int               `json:"fftSize"`
+	Hop              int               `json:"hopSamples"`
+	BandEdges        [6]float64        `json:"bandEdgesHz"`
+	SpectrogramBins  int               `json:"spectrogramBins"`
+	SpectrogramBinHz []float64         `json:"spectrogramBinHz"`
+	Tracks           map[string]*Track `json:"tracks"`
+	Rhythm           Rhythm            `json:"rhythm"`
+	Silence          []Interval        `json:"silence"`
+	Cues             []Cue             `json:"cues"`
+	Alignment        *Alignment        `json:"stemAlignment,omitempty"`
+	Provenance       map[string]string `json:"provenance"`
 }

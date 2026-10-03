@@ -19,6 +19,7 @@ type track struct {
 	Centroid []float64             `json:"centroidHz"`
 	Width    []float64             `json:"stereoWidth"`
 	Events   []audioanalysis.Event `json:"onsets"`
+	Melody   *audioanalysis.Melody `json:"melody,omitempty"`
 }
 type controls struct {
 	Schema  int                      `json:"schemaVersion"`
@@ -38,7 +39,7 @@ func run() error {
 	if err := json.Unmarshal(data, &a); err != nil {
 		return err
 	}
-	if a.SchemaVersion != 1 || a.Hop <= 0 || a.SampleRate <= 0 {
+	if a.SchemaVersion != 2 || a.Hop <= 0 || a.SampleRate <= 0 {
 		return fmt.Errorf("unsupported analysis schema or timing")
 	}
 	mix := a.Tracks["mix"]
@@ -53,13 +54,13 @@ func run() error {
 	if hex.EncodeToString(hash[:]) != mix.Source.SHA256 {
 		return fmt.Errorf("source hash does not match analysis")
 	}
-	c := controls{1, float64(a.Hop) / float64(a.SampleRate), a.Rhythm, a.Cues, a.Silence, make(map[string]track)}
+	c := controls{2, float64(a.Hop) / float64(a.SampleRate), a.Rhythm, a.Cues, a.Silence, make(map[string]track)}
 	for _, name := range []string{"mix", "drums", "bass", "other", "vocals"} {
 		t := a.Tracks[name]
 		if t == nil {
 			return fmt.Errorf("missing %s", name)
 		}
-		c.Tracks[name] = track{t.Source, t.Energy, t.BandControls, t.Centroid, t.Width, t.Events}
+		c.Tracks[name] = track{t.Source, t.Energy, t.BandControls, t.Centroid, t.Width, t.Events, t.Melody}
 	}
 	data, err = json.Marshal(c)
 	if err != nil {

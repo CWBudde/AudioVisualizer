@@ -26,6 +26,18 @@ func QuantizeTrack(t *Track) {
 	for i, v := range t.Spectrogram {
 		t.Spectrogram[i] = math.Round(v*100) / 100
 	}
+	if m := t.Melody; m != nil {
+		for _, x := range append([][]float64{m.Pitch, m.Voicing}, m.Chroma[:]...) {
+			for i, v := range x {
+				x[i] = math.Round(v*1e3) / 1e3
+			}
+		}
+		for i := range m.Notes {
+			m.Notes[i].Strength = math.Round(m.Notes[i].Strength*1e3) / 1e3
+			m.Notes[i].Start = math.Round(m.Notes[i].Start*1e6) / 1e6
+			m.Notes[i].End = math.Round(m.Notes[i].End*1e6) / 1e6
+		}
+	}
 }
 
 func sectionStats(t *Track, start, end float64) (rms, centroid, width float64, bands [5]float64, events int) {

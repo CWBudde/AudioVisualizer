@@ -34,7 +34,7 @@ func run() error {
 	if err := os.MkdirAll(*output, 0755); err != nil {
 		return err
 	}
-	a := &aa.Analysis{SchemaVersion: 1, SampleRate: aa.SampleRate, FFTSize: aa.FFTSize, Hop: aa.Hop, BandEdges: aa.BandEdges, SpectrogramBins: 64, Tracks: map[string]*aa.Track{}, Provenance: map[string]string{"go": runtime.Version(), "normalization": "per-track active-sample 95th percentile, -80 dBFS gate, attack 10 ms, release 120/150 ms", "resampling": "algo-dsp QualityBest, tail flush, fractional FIR delay compensation", "stemMode": "required"}}
+	a := &aa.Analysis{SchemaVersion: 2, SampleRate: aa.SampleRate, FFTSize: aa.FFTSize, Hop: aa.Hop, BandEdges: aa.BandEdges, SpectrogramBins: aa.SpectrogramBins, Tracks: map[string]*aa.Track{}, Provenance: map[string]string{"go": runtime.Version(), "normalization": "per-track active-sample 95th percentile, -80 dBFS gate, attack 10 ms, release 150 ms (energy) / 120 ms (bands)", "resampling": "algo-dsp QualityBest, tail flush, fractional FIR delay compensation", "stemMode": "required"}}
 	for _, name := range []string{"algo-dsp", "algo-fft", "algo-vecmath", "algo-approx", "wav"} {
 		v, err := exec.Command("git", "-C", "../"+name, "rev-parse", "HEAD").Output()
 		if err != nil {
@@ -53,6 +53,9 @@ func run() error {
 	}
 	if mix.Source.SHA256 != "20a7f80e5de0e2052071fcba6a838249437d60deb42991b42ed03f1cd955066d" {
 		return fmt.Errorf("PixelParade source checksum mismatch")
+	}
+	if a.SpectrogramBinHz, err = aa.SpectrogramBinHz(); err != nil {
+		return err
 	}
 	t, err := aa.Analyze(mix)
 	if err != nil {
@@ -89,8 +92,25 @@ func run() error {
 	if rhythmTrack == nil {
 		rhythmTrack = t
 	}
-	a.Rhythm = aa.EstimateRhythm(rhythmTrack, *prior)
-	a.Silence = aa.FindSilence(mix)
+	if a.Rhythm, err = aa.EstimateRhythm(rhythmTrack, *prior); err != nil {
+		return err
+	}
+	if drums, bass := a.Tracks["drums"], a.Tracks["bass"]; drums != nil && bass != nil {
+		if err := aa.ClassifyDrums(drums); err != nil {
+			return err
+		}
+		a.Rhythm.Downbeat = aa.EstimateDownbeat(a.Rhythm, drums.Events, bass.Events)
+		a.Rhythm.Meter = fmt.Sprintf("4/4; downbeat at beat index %d from kick/bass attack accents", a.Rhythm.Downbeat)
+	}
+	if other := a.Tracks["other"]; other != nil {
+		if other.Melody, err = aa.AnalyzeMelody(stemAudio[2], other.Events); err != nil {
+			return err
+		}
+		fmt.Printf("other melody: %d notes\n", len(other.Melody.Notes))
+	}
+	if a.Silence, err = aa.FindSilence(mix); err != nil {
+		return err
+	}
 	a.Cues = aa.PixelParadeCues(mix.Source.Duration, a.Silence)
 	for _, track := range a.Tracks {
 		aa.QuantizeTrack(track)
