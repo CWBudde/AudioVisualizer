@@ -1,44 +1,60 @@
 # PixelParade
 
-A deterministic Remotion music visualizer, driven by locally separated stems and Go audio analysis. Every version renders the full track at 1080×1080 and 60 fps.
+A music video for the instrumental track "PixelParade" (86 s, 105 BPM, G major), built with [Remotion](https://www.remotion.dev/) from Go audio analysis of the song and its separated stems. Every frame is a pure function of song time and the recorded features: there is no browser FFT and no accumulated animation state.
 
-| Version | Composition | Source | Look |
+**Watch it running live in your browser: [see here](https://cwbudde.github.io/PixelParade/).**
+
+## Versions
+
+| Version | Composition | Source | What it is |
 |---|---|---|---|
-| v1 | `PixelParade-v1` | `src/v1/` | SVG/Canvas neon geometric parade |
-| v2 | `PixelParade-v2` | `src/v2/` | WebGL shader worlds with a melody ribbon, driven by per-cue shot presets |
-| v3 | `PixelParade-v3` | `src/v3/` | **WICK**, a narrative music video in React Three Fiber: a pixel flame lights a sleeping plain, and the tiles rise and follow it |
+| **v3** (default) | `PixelParade-v3` | `src/v3/` | **WICK**, a narrative music video in React Three Fiber. A pixel flame crosses a sleeping plain of dark tiles; every note lights a tile, the lit tiles rise and follow, and in the last bars the route they walked turns out to spell the melody's own shape. |
+| v2 | `PixelParade-v2` | `src/v2/` | Raw WebGL2 shader worlds with a melody ribbon, switched by per-cue shot presets. |
+| v1 | `PixelParade-v1` | `src/v1/` | SVG/Canvas neon geometric parade. |
 
-Shared analysis loading, audio controls and types live in `src/shared/`. Outputs and reports are per version: `out/<version>/` and `analysis/<version>/`. The current master is v3, [out/v3/PixelParade-v3.mp4](out/v3/PixelParade-v3.mp4); its export and A/V sync checks are in [analysis/v3/render-validation.json](analysis/v3/render-validation.json). The v1 checks are in [analysis/v1/render-validation.json](analysis/v1/render-validation.json).
+All versions render the full track at 1080×1080 and 60 fps (5168 frames). Shared analysis loading, audio controls and types live in `src/shared/`. Outputs and reports are kept per version in `out/<version>/` and `analysis/<version>/`.
 
-## v3: WICK
-
-The story is built on a deeper analysis of the song. `bun run story` (`cmd/story`) estimates the key, chords, phrase structure and recurring motifs (leitmotifs), and writes `analysis/story.md`, the self-similarity images and `analysis/PixelParade.mid` (lead, arp, bass, chords, drums and motif marker lanes) for listening alongside the WAV in a DAW. The compact `public/analysis/story.json` drives v3. The creative documents are in `docs/v3/`: the musical reading, three concept treatments, and the production script that the scenes implement.
-
-v3 renders a timeline of scenes (`src/v3/timeline.ts`) through a compositor that blends two scenes with dissolve, burn, light-wash or iris transitions. A persistent crest glyph (the arp motif) stays above every transition. The world (route, tiles, 2048 walkers) is a pure function of song time in `src/v3/world/`.
-
-## Run
+## Quick start
 
 ```sh
-rtk proxy bun install --frozen-lockfile
-rtk proxy bun run studio
-rtk proxy bun run validate
-rtk proxy bun run validate:all
-rtk proxy bun run render:stills
-rtk proxy bun run render:preview
-rtk proxy bun run render
-rtk proxy sh scripts/go.sh run ./cmd/verifyrender
+bun install --frozen-lockfile
+bun run studio            # Remotion Studio with all three compositions
+bun run web               # the browser player (the same one deployed to GitHub Pages)
 ```
 
-`PP_VERSION` (`v1`, `v2` or `v3`, default `v3`) selects the version for every step, for example `PP_VERSION=v1 bun run render`. The render scripts compile their TypeScript orchestration with Bun and execute the Remotion renderer with Node. Outputs go into `out/<version>/`: `PixelParade-<version>.mp4`, four preview clips, and captured scene frames. `render:stills 540 1200` renders only the given frames for quick look-dev. The studio uses the original WAV and the exported compact controls; it does not require stem playback.
+`PP_VERSION` (`v1`, `v2` or `v3`, default `v3`) selects the version for every validation and render step, for example `PP_VERSION=v1 bun run render:stills`.
 
-The master renders in nine resumable sections under `out/<version>/segments/`. A fingerprint over the shared and version-specific sources, data and settings prevents mixing sections from different code. Re-running `bun run render` verifies and reuses completed sections. Assembly copies the video streams and encodes the complete original WAV once. The render command then runs the Go output verifier automatically.
+| Command | What it does |
+|---|---|
+| `bun run validate` / `validate:all` | Checks the soundtrack hash, the exported controls, event timing and the version's own invariants (one version / all three). |
+| `bun run render:stills [frames…]` | Renders the review stills (or just the given frames) to `out/<version>/stills/`, re-renders some frames out of order to prove the capture is deterministic, and fails on blank frames. |
+| `bun run render:preview` | Renders four preview clips to `out/<version>/previews/`. |
+| `bun run render` | Renders the master `out/<version>/PixelParade-<version>.mp4` in nine resumable sections, muxes the original WAV once and runs the Go verifier. |
+| `bun run preflight` | Checks headless WebGL2 and React Three Fiber capture. |
+| `bun run web:build` | Builds the browser player into `dist/web/`. |
 
-All renders use Remotion's managed headless browser (`ensureBrowser`) with ANGLE for WebGL. Set `PP_BROWSER` to a Chrome headless shell binary to override it. `bun run preflight` checks headless WebGL2 capture.
+The render scripts compile their orchestration with Bun and run the Remotion renderer under Node, using Remotion's managed headless browser with ANGLE for WebGL (set `PP_BROWSER` to override the binary). A fingerprint over the shared and version-specific sources, data and settings stops sections from different code being mixed; re-running `bun run render` reuses finished sections. Concurrent look-dev runs can isolate their bundle and stills with `PP_WORKSPACE=<name>`.
 
-## Analysis and verification
+## Analysis pipeline (Go)
 
-`PLAN.md` records the source measurements, storyboard, controls, separation setup, and production decisions. `bun run analyze` reruns the Go analyzer and compact exporter; existing stems are required. The full inspection timeline is `analysis/overview.html`.
+| Command | Output |
+|---|---|
+| `bun run analyze` | `cmd/analyze` measures the mix and the Demucs stems (`scripts/separate.py`): tempo and beat grid, onsets with kick/snare/hat labels, band energies, the melody of the `other` stem, sections and silences → `analysis/features.json`, `analysis/report.md`, the interactive `analysis/overview.html`. `cmd/controls` exports the compact `public/analysis/controls.json` that all versions read. |
+| `bun run story` | `cmd/story` builds the musical skeleton for v3: bass line, cleaned melody, key (G major), chords per half bar, phrase structure from self-similarity, and recurring motifs (leitmotifs) with their transposed returns → `analysis/story.md`, `analysis/story-ssm-*.png`, `public/analysis/story.json`, and **`analysis/PixelParade.mid`** (lead, arpeggio, bass, chords, drums and motif marker lanes) to load next to the WAV in a DAW. |
+| `bun run verify:render` | `cmd/verifyrender` checks the master's format and fast start, decodes it completely, and compares the encoded soundtrack with the original at the beginning, middle, end and tail. |
 
-`bun run validate` verifies the soundtrack hash, schema, exact Go-exported controls and pause/event timing, plus version checks (v1: deterministic poses, safe geometry bounds, particle limits; v2: deterministic, finite shader uniforms; v3: timeline coverage, route and walker continuity, tile events, camera sanity, determinism and no wall-clock APIs). Actual frame capture hashes are recorded in `analysis/<version>/frame-determinism.json` by `render:stills`. `cmd/verifyrender` checks the master format and fast start, decodes the complete video, and compares the encoded soundtrack to the original at the beginning, middle, end, and tail.
+`PLAN.md` documents the source measurements and the v1 production.
 
-In every version, each frame is a pure function of frame time and recorded features. There is no browser FFT or accumulated animation state. Only the original WAV is heard.
+## How v3 is made
+
+The story was developed from the analysis rather than written first. The documents are in `docs/v3/`:
+
+1. `music-reading.md`: the instrument cast, a bar map, recurrences, the key moments and how the music crosses each boundary.
+2. `concepts/`: three competing treatments (WICK, Ember Bell, Upwelling).
+3. `script.md`: the production script of the chosen treatment, which the code implements.
+
+In code, `src/v3/timeline.ts` lists the scenes keyed to cues and bars. A compositor renders up to two scenes into their own HDR targets and blends them with a dissolve, burn, light-wash or iris transition, so there are no hard cuts. The crest glyph (the arpeggio motif) is drawn above every transition. The world in `src/v3/world/` is a pure function of song time: a route traced from the motif's contour, 25,600 tiles and 2,048 walkers. `PP_VERSION=v3 bun run validate` checks timeline coverage, route and walker continuity, tile events, camera sanity, determinism and the absence of wall-clock APIs.
+
+## Browser player and GitHub Pages
+
+`web/` contains a small Vite app that plays the three compositions live with `@remotion/player`, together with the original soundtrack. `.github/workflows/pages.yml` builds it on every push to `main` that touches the app or its data and deploys it to GitHub Pages. The repository's Pages source must be set to *GitHub Actions*. Playback runs in real time on the viewer's GPU, so v2 and v3 need WebGL2. Output can differ slightly from the deterministic offline render.
