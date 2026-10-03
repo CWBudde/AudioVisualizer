@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/cwbudde/AudioVisualizer/internal/audioanalysis"
+	"github.com/cwbudde/algo-dsp/measure/music/align"
 )
 
 type stream struct {
@@ -36,44 +37,15 @@ type window struct {
 	GainDB      float64 `json:"gainDB"`
 }
 
-func stats(a, b *audioanalysis.Audio, start, end, lag int) (float64, float64) {
-	var ab, aa, bb float64
-	for i := start; i < end; i += 16 {
-		j := i + lag
-		if j < 0 || j >= len(b.Channels[0]) {
-			continue
-		}
-		for ch := range a.Channels {
-			x, y := a.Channels[ch][i], b.Channels[ch][j]
-			ab += x * y
-			aa += x * x
-			bb += y * y
-		}
-	}
-	return ab / math.Sqrt(aa*bb), 10 * math.Log10(bb/aa)
-}
-
 // compare works on loaded channels, which Load resamples to the analysis rate,
 // not the file's original Source.SampleRate.
-func compare(a, b *audioanalysis.Audio, start, end float64) window {
+func compare(a, b *audioanalysis.Audio, start, end float64) (window, error) {
 	rate := float64(audioanalysis.SampleRate)
-	i, j := int(start*rate), min(int(end*rate), len(a.Channels[0]))
-	best, lag := -1.0, 0
-	for offset := -480; offset <= 480; offset += 16 {
-		c, _ := stats(a, b, i, j, offset)
-		if c > best {
-			best, lag = c, offset
-		}
+	res, err := align.LagChannels(a.Channels, b.Channels, rate, align.WithLagWindow(start, end))
+	if err != nil {
+		return window{}, err
 	}
-	coarse := lag
-	for offset := coarse - 16; offset <= coarse+16; offset++ {
-		c, _ := stats(a, b, i, j, offset)
-		if c > best {
-			best, lag = c, offset
-		}
-	}
-	c, gain := stats(a, b, i, j, lag)
-	return window{start, end, float64(lag) * 1000 / rate, c, gain}
+	return window{start, end, float64(res.Samples) * 1000 / rate, res.Correlation, res.GainDB}, nil
 }
 
 // Parse top-level ISO BMFF boxes rather than looking for strings in compressed data.
@@ -113,6 +85,7 @@ func fastStart(path string) (bool, error) {
 		}
 	}
 }
+
 // version mirrors scripts/version.ts: PP_VERSION picks which visualizer's master to check.
 func version() (string, error) {
 	v := os.Getenv("PP_VERSION")
@@ -185,7 +158,14 @@ func run() error {
 	if math.Abs(globalGain) > .2 {
 		return fmt.Errorf("whole-file gain mismatch: %.3f dB", globalGain)
 	}
-	windows := []window{compare(a, b, 2, 12), compare(a, b, 35, 45), compare(a, b, 72, 82), compare(a, b, 82.3, 86.12)}
+	windows := []window{}
+	for _, span := range [][2]float64{{2, 12}, {35, 45}, {72, 82}, {82.3, 86.12}} {
+		w, err := compare(a, b, span[0], span[1])
+		if err != nil {
+			return err
+		}
+		windows = append(windows, w)
+	}
 	for _, w := range windows {
 		if w.Correlation < .98 || math.Abs(w.GainDB) > .2 || math.Abs(w.LagMS) > 1000.0/60 {
 			return fmt.Errorf("encoded audio mismatch: %+v", w)

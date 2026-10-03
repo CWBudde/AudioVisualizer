@@ -7,6 +7,11 @@ import (
 	"sort"
 
 	"github.com/cwbudde/AudioVisualizer/internal/audioanalysis"
+	"github.com/cwbudde/algo-dsp/measure/music/features"
+	"github.com/cwbudde/algo-dsp/measure/music/harmony"
+	"github.com/cwbudde/algo-dsp/measure/music/motif"
+	"github.com/cwbudde/algo-dsp/measure/music/structure"
+	"github.com/cwbudde/midi/smf"
 )
 
 type SourceRef struct {
@@ -92,64 +97,47 @@ type Story struct {
 	onsets        map[string][]audioanalysis.Event
 }
 
-// features gives windowed access to the stored tracks and the bass melody.
-type features struct {
+// input gives windowed access to the stored tracks and the bass melody.
+type input struct {
 	a    *audioanalysis.Analysis
 	bass *audioanalysis.Melody
 	g    Grid
 }
 
-func (f features) track(name string) *audioanalysis.Track { return f.a.Tracks[name] }
+func (in input) track(name string) *audioanalysis.Track { return in.a.Tracks[name] }
 
-// harmony is the other-stem chroma over [t0, t1), each frame weighted by its
-// RMS because the stored chroma is normalised per frame.
-func (f features) harmony(t0, t1 float64) [12]float64 {
-	t := f.track("other")
-	var c [12]float64
-	lo, hi := f.g.frames(t0, t1, len(t.RMS))
-	for i := lo; i < hi; i++ {
-		for pc := range 12 {
-			c[pc] += t.RMS[i] * t.Melody.Chroma[pc][i]
-		}
-	}
-	return c
+// windows pools the other-stem chroma (each frame weighted by its RMS,
+// because the stored chroma is normalised per frame) over spans. Bass is
+// voicing-weighted bass chroma (in seconds) plus clean bass note overlap ×
+// strength; LevelDB is the other-stem level.
+func (in input) windows(spans []harmony.Span, bassNotes []StoryNote) ([]harmony.Window, error) {
+	other := in.track("other")
+	return harmony.Windows(other.Melody.Chroma, other.RMS, frameRate, spans,
+		harmony.WithBassChroma(in.bass.Chroma, in.bass.Voicing), harmony.WithBassNotes(melodyNotes(bassNotes)))
 }
 
-// bassPC is voicing-weighted bass chroma (in seconds) plus clean bass note
-// overlap × strength.
-func (f features) bassPC(t0, t1 float64, notes []StoryNote) [12]float64 {
-	var c [12]float64
-	lo, hi := f.g.frames(t0, t1, len(f.bass.Voicing))
-	for i := lo; i < hi; i++ {
-		for pc := range 12 {
-			c[pc] += f.bass.Voicing[i] * f.bass.Chroma[pc][i] / frameRate
-		}
+// levels runs features.Activity on frame-level series (RMS or band levels)
+// over spans; SpanDB is each span's RMS level in dBFS.
+func levels(series map[string][]float64, spans []harmony.Span, opts ...features.ActivityOption) (map[string]features.TrackActivity, error) {
+	intervals := make([]features.Interval, len(spans))
+	for i, s := range spans {
+		intervals[i] = features.Interval(s) // harmony.Span mirrors features.Interval field for field
 	}
-	for _, n := range notes {
-		if o := math.Min(n.End, t1) - math.Max(n.Start, t0); o > 0 {
-			c[n.MIDI%12] += o * n.Strength
-		}
-	}
-	return c
+	return features.Activity(series, frameRate, intervals, opts...)
 }
 
-func (f features) meanDB(name string, t0, t1 float64) float64 {
-	t := f.track(name)
-	lo, hi := f.g.frames(t0, t1, len(t.RMS))
-	sum := 0.0
-	for i := lo; i < hi; i++ {
-		sum += t.RMS[i] * t.RMS[i]
+func (in input) rms(names ...string) map[string][]float64 {
+	out := map[string][]float64{}
+	for _, name := range names {
+		out[name] = in.track(name).RMS
 	}
-	if hi <= lo {
-		return audioanalysis.DB(0)
-	}
-	return audioanalysis.DB(math.Sqrt(sum / float64(hi-lo)))
+	return out
 }
 
-func (f features) energy(name string) func(t0, t1 float64) float64 {
+func (in input) energy(name string) func(t0, t1 float64) float64 {
 	return func(t0, t1 float64) float64 {
-		t := f.track(name)
-		lo, hi := f.g.frames(t0, t1, len(t.Energy))
+		t := in.track(name)
+		lo, hi := frames(t0, t1, len(t.Energy))
 		sum := 0.0
 		for i := lo; i < hi; i++ {
 			sum += t.Energy[i]
@@ -161,21 +149,8 @@ func (f features) energy(name string) func(t0, t1 float64) float64 {
 	}
 }
 
-func normalized(c [12]float64) [12]float64 {
-	sum := 0.0
-	for _, v := range c {
-		sum += v
-	}
-	if sum > 0 {
-		for i := range c {
-			c[i] /= sum
-		}
-	}
-	return c
-}
-
-func (f features) cueAt(t float64) string {
-	for _, c := range f.a.Cues {
+func (in input) cueAt(t float64) string {
+	for _, c := range in.a.Cues {
 		if t >= c.Start && t < c.End {
 			return c.Name
 		}
@@ -183,8 +158,21 @@ func (f features) cueAt(t float64) string {
 	return ""
 }
 
+func argmax(c [12]float64) int {
+	best := 0
+	for i, v := range c {
+		if v > c[best] {
+			best = i
+		}
+	}
+	return best
+}
+
+var stems = []string{"drums", "bass", "other", "vocals"}
+
 // Build runs the whole pipeline on a feature analysis plus the bass-stem
-// melody tracked with audioanalysis.BassMelodyOptions.
+// melody tracked with melody.BassPreset. It sets p.MIDITicksPerSecs from the
+// grid tempo.
 func Build(a *audioanalysis.Analysis, bassMelody *audioanalysis.Melody, p Params) (*Story, error) {
 	for _, name := range []string{"mix", "drums", "bass", "other", "vocals"} {
 		if a.Tracks[name] == nil {
@@ -194,70 +182,96 @@ func Build(a *audioanalysis.Analysis, bassMelody *audioanalysis.Melody, p Params
 	if a.Tracks["other"].Melody == nil || bassMelody == nil {
 		return nil, fmt.Errorf("missing lead or bass melody")
 	}
-	g := NewGrid(a.Rhythm, a.Tracks["mix"].Source.Duration)
-	f := features{a, bassMelody, g}
+	g, err := NewGrid(a.Rhythm, a.Tracks["mix"].Source.Duration)
+	if err != nil {
+		return nil, err
+	}
+	in := input{a, bassMelody, g}
+	p.MIDITicksPerSecs = g.BPM() / 60 * smf.PPQ
 	s := &Story{SchemaVersion: 1, Params: p, Grid: g, Cues: a.Cues, onsets: map[string][]audioanalysis.Event{"drums": a.Tracks["drums"].Events, "bass": a.Tracks["bass"].Events}}
-	s.Lead.Clean, s.Lead.Raw = CleanNotes(a.Tracks["other"].Melody.Notes, g, p.Lead)
-	s.Bass.Clean, s.Bass.Raw = CleanNotes(bassMelody.Notes, g, p.Bass)
+	if s.Lead.Clean, s.Lead.Raw, err = CleanNotes(a.Tracks["other"].Melody.Notes, g, p.Lead); err != nil {
+		return nil, err
+	}
+	if s.Bass.Clean, s.Bass.Raw, err = CleanNotes(bassMelody.Notes, g, p.Bass); err != nil {
+		return nil, err
+	}
 	for i := range s.Bass.Clean {
 		s.Bass.Clean[i].Voice = "bass"
 	}
 
-	// Key: RMS-weighted harmony chroma plus duration-weighted bass notes.
-	var bassNotes [12]float64
+	// Key: RMS-weighted harmony chroma plus duration-weighted bass notes;
+	// bass at the first and last bar of every cue is the tonic evidence.
+	var bassNotes, profile, edges [12]float64
 	for _, n := range s.Bass.Clean {
 		bassNotes[n.MIDI%12] += n.End - n.Start
 	}
-	h, bn := normalized(f.harmony(0, g.Duration)), normalized(bassNotes)
-	var profile, edges [12]float64
-	for i := range profile {
-		profile[i] = h[i] + p.KeyBassWeight*bn[i]
-	}
+	spans := []harmony.Span{{Start: 0, End: g.Duration()}}
 	for _, c := range a.Cues {
-		if c.End-c.Start < g.BarSeconds {
+		if c.End-c.Start < g.BarSeconds() {
 			continue
 		}
 		for _, b := range []int{g.Bar(c.Start + 1e-3), g.Bar(c.End - 1e-3)} {
-			pc := normalized(f.bassPC(g.BarStart(b), g.BarStart(b+1), s.Bass.Clean))
-			for i := range edges {
-				edges[i] += pc[i]
-			}
+			spans = append(spans, harmony.Span{Start: g.BarStart(b), End: g.BarStart(b + 1)})
 		}
 	}
-	s.Key = EstimateKey(profile, edges, p.KeyRelativeTie)
+	keyWindows, err := in.windows(spans, s.Bass.Clean)
+	if err != nil {
+		return nil, err
+	}
+	h, bn := harmony.Normalize(keyWindows[0].Chroma), harmony.Normalize(bassNotes)
+	for i := range profile {
+		profile[i] = h[i] + p.KeyBassWeight*bn[i]
+	}
+	for _, w := range keyWindows[1:] {
+		pc := harmony.Normalize(w.Bass)
+		for i := range edges {
+			edges[i] += pc[i]
+		}
+	}
+	key, ke, err := estimateKey(profile, edges, p.KeyRelativeTie)
+	if err != nil {
+		return nil, err
+	}
+	s.Key = ke
 
 	// Chords per half bar.
-	windows := []ChordWindow{}
-	step := float64(p.Chords.BeatsPerChord) * g.BeatSeconds
+	spans = nil
+	step := float64(p.Chords.BeatsPerChord) * g.BeatSeconds()
 	for b := range g.Bars() {
-		for t := g.BarStart(b); t < g.BarStart(b+1)-1e-6 && t < g.Duration; t += step {
-			end := math.Min(t+step, g.Duration)
-			windows = append(windows, ChordWindow{Start: t, End: end, Chroma: f.harmony(t, end), Bass: f.bassPC(t, end, s.Bass.Clean), LevelDB: f.meanDB("other", t, end)})
+		for t := g.BarStart(b); t < g.BarStart(b+1)-1e-6 && t < g.Duration(); t += step {
+			spans = append(spans, harmony.Span{Start: t, End: math.Min(t+step, g.Duration())})
 		}
 	}
-	s.Chords = DetectChords(windows, s.Key, g, p.Chords)
+	chordWindows, err := in.windows(spans, s.Bass.Clean)
+	if err != nil {
+		return nil, err
+	}
+	if s.Chords, err = detectChords(chordWindows, key, g, p.Chords); err != nil {
+		return nil, err
+	}
 
-	s.structure(f)
-	s.motifs(f)
-	s.Roles = Roles(a, g, s.Lead.Clean, s.Bass.Clean, s.Chords, p.RoleActiveDB)
-	s.bars(f)
-	return s, nil
+	beats, err := in.windows(g.beatSpans(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.structure(in, beats); err != nil {
+		return nil, err
+	}
+	if err := s.motifs(in, beats); err != nil {
+		return nil, err
+	}
+	active, err := levels(in.rms(stems...), g.barSpans(), features.WithActivityThreshold(p.RoleActiveDB))
+	if err != nil {
+		return nil, err
+	}
+	s.Roles = Roles(active, g, s.Lead.Clean, s.Bass.Clean, s.Chords)
+	return s, s.bars(in, active)
 }
 
-func (s *Story) structure(f features) {
+func (s *Story) structure(in input, beats []harmony.Window) error {
 	g, p := s.Grid, s.Params.Structure
-	beats := len(g.Beats)
-	newBlock := func(dims int, w float64, fill func(t0, t1 float64, v []float64)) block {
-		b := block{weight: w}
-		for i := range beats {
-			v := make([]float64, dims)
-			fill(g.BeatStart(i), g.BeatStart(i+1), v)
-			b.values = append(b.values, v)
-		}
-		return b
-	}
-	l2 := func(c [12]float64, v []float64) {
-		norm := 0.0
+	l2 := func(c [12]float64) []float64 {
+		v, norm := make([]float64, 12), 0.0
 		for _, x := range c {
 			norm += x * x
 		}
@@ -266,35 +280,41 @@ func (s *Story) structure(f features) {
 				v[i] = x / math.Sqrt(norm)
 			}
 		}
+		return v
 	}
-	mix := f.track("mix")
-	beatVectors := assemble([]block{
-		newBlock(12, p.ChromaWeight, func(t0, t1 float64, v []float64) { l2(f.harmony(t0, t1), v) }),
-		newBlock(12, p.BassChromaWeight, func(t0, t1 float64, v []float64) { l2(f.bassPC(t0, t1, nil), v) }),
-		newBlock(5, p.BandWeight, func(t0, t1 float64, v []float64) {
-			lo, hi := g.frames(t0, t1, len(mix.RMS))
-			for b := range 5 {
-				sum := 0.0
-				for i := lo; i < hi; i++ {
-					sum += mix.Bands[b][i] * mix.Bands[b][i]
-				}
-				v[b] = audioanalysis.DB(math.Sqrt(sum / float64(max(1, hi-lo))))
-			}
-		}),
-		newBlock(4, p.StemWeight, func(t0, t1 float64, v []float64) {
-			for k, name := range []string{"drums", "bass", "other", "vocals"} {
-				v[k] = f.meanDB(name, t0, t1)
-			}
-		}),
-	})
+	mix := in.track("mix")
+	series := in.rms(stems...)
+	for b := range 5 {
+		series[fmt.Sprint("band", b)] = mix.Bands[b]
+	}
+	beatDB, err := levels(series, g.beatSpans())
+	if err != nil {
+		return err
+	}
+	chroma, bass, bands, stemDB := [][]float64{}, [][]float64{}, [][]float64{}, [][]float64{}
+	for i, w := range beats {
+		chroma, bass = append(chroma, l2(w.Chroma)), append(bass, l2(w.Bass))
+		bands, stemDB = append(bands, make([]float64, 5)), append(stemDB, make([]float64, 4))
+		for b := range 5 {
+			bands[i][b] = beatDB[fmt.Sprint("band", b)].SpanDB[i]
+		}
+		for k, name := range stems {
+			stemDB[i][k] = beatDB[name].SpanDB[i]
+		}
+	}
+	beatVectors, err := structure.Blocks([]structure.Block{{Rows: chroma, Weight: p.ChromaWeight}, {Rows: bass, Weight: p.BassChromaWeight},
+		{Rows: bands, Weight: p.BandWeight}, {Rows: stemDB, Weight: p.StemWeight}})
+	if err != nil {
+		return err
+	}
 	// Bars: the four beat vectors of the bar plus a 16-step drum grid.
-	drums := block{weight: p.DrumGridWeight}
+	drums := make([][]float64, g.Bars())
 	bars := make([][]float64, g.Bars())
 	for b := range bars {
-		drums.values = append(drums.values, make([]float64, 48))
-		first := int(math.Round((g.BarStart(b) - g.OriginSeconds) / g.BeatSeconds))
+		drums[b] = make([]float64, 48)
+		first := int(math.Round((g.BarStart(b) - g.Origin()) / g.BeatSeconds()))
 		for k := range 4 {
-			if i := first + k; i >= 0 && i < beats {
+			if i := first + k; i >= 0 && i < len(beats) {
 				bars[b] = append(bars[b], beatVectors[i]...)
 			} else {
 				bars[b] = append(bars[b], make([]float64, len(beatVectors[0]))...)
@@ -302,37 +322,57 @@ func (s *Story) structure(f features) {
 		}
 	}
 	kinds := map[string]int{"kick": 0, "snare": 1, "hat": 2}
-	for _, e := range f.track("drums").Events {
+	for _, e := range in.track("drums").Events {
 		k, ok := kinds[e.Kind]
-		b := g.Bar(e.Time + g.SixteenthSeconds/2)
+		b := g.Bar(e.Time + g.SlotSeconds()/2)
 		if !ok || b >= len(bars) {
 			continue
 		}
 		pos := min(15, max(0, g.Slot(e.Time)-g.Slot(g.BarStart(b))))
-		v := drums.values[b]
-		v[pos*3+k] = math.Max(v[pos*3+k], e.Strength)
+		drums[b][pos*3+k] = math.Max(drums[b][pos*3+k], e.Strength)
 	}
-	for b, v := range assemble([]block{drums}) {
+	drumVectors, err := structure.Blocks([]structure.Block{{Rows: drums, Weight: p.DrumGridWeight}})
+	if err != nil {
+		return err
+	}
+	for b, v := range drumVectors {
 		bars[b] = append(bars[b], v...)
 	}
-	beatSSM, barSSM := SelfSimilarity(beatVectors), SelfSimilarity(bars)
-	s.Novelty = FooteNovelty(beatSSM, p.NoveltyHalfWidth)
-	s.Boundaries = Boundaries(s.Novelty, g, f.a.Cues, p.PeakRadius, p.PeakSigma)
+	beatSSM, err := structure.SelfSimilarity(beatVectors)
+	if err != nil {
+		return err
+	}
+	barSSM, err := structure.SelfSimilarity(bars)
+	if err != nil {
+		return err
+	}
+	if s.Novelty, err = structure.FooteNovelty(beatSSM, p.NoveltyHalfWidth); err != nil {
+		return err
+	}
+	if s.Boundaries, err = boundaries(s.Novelty, g, in.a.Cues, p.PeakRadius, p.PeakSigma); err != nil {
+		return err
+	}
 	for i := range s.Novelty {
 		s.Novelty[i] = r3(s.Novelty[i])
 	}
-	phrases, toFirst := Label(barSSM, p.PhraseBars, p.SameThreshold, p.VariantThreshold, false)
+	phrases, toFirst, err := label(barSSM, p.PhraseBars, p.SameThreshold, p.VariantThreshold)
+	if err != nil {
+		return err
+	}
 	for i, l := range phrases {
 		first, last := i*p.PhraseBars, min(g.Bars(), (i+1)*p.PhraseBars)-1
 		start := g.BarStart(first)
-		sec := Section{Label: l, Start: r6(math.Max(0, start)), End: r6(math.Min(g.Duration, g.BarStart(last+1))), FirstBar: first, LastBar: last, SimilarityToFirst: toFirst[i]}
-		sec.Cue = f.cueAt(start + g.BeatSeconds/2)
+		sec := Section{Label: l, Start: r6(math.Max(0, start)), End: r6(math.Min(g.Duration(), g.BarStart(last+1))), FirstBar: first, LastBar: last, SimilarityToFirst: toFirst[i]}
+		sec.Cue = in.cueAt(start + g.BeatSeconds()/2)
 		if i == 0 {
 			sec.Start = 0
 		}
 		s.Sections = append(s.Sections, sec)
 	}
-	barLabels, _ := Label(barSSM, 1, p.SameThreshold, p.VariantThreshold, true)
+	barLabels, _, err := label(barSSM, 1, p.SameThreshold, p.VariantThreshold, structure.WithLowercase())
+	if err != nil {
+		return err
+	}
 	s.Bars = make([]Bar, g.Bars())
 	for b := range s.Bars {
 		s.Bars[b] = Bar{Index: b, Label: barLabels[b], Section: phrases[b/p.PhraseBars]}
@@ -346,46 +386,69 @@ func (s *Story) structure(f features) {
 		return m
 	}
 	s.SSM = SSM{round(beatSSM), round(barSSM)}
+	return nil
 }
 
-func (s *Story) motifs(f features) {
-	g, p := s.Grid, s.Params.Motifs
-	spans := []Span{}
-	for _, c := range f.a.Cues {
-		spans = append(spans, Span{c.Name, c.Start, c.End})
+// motifs finds chroma motifs first (other-stem beat chroma, silent below the
+// chord gate), then lead and bass note motifs corroborated by them, and
+// ranks all of them.
+func (s *Story) motifs(in input, beats []harmony.Window) error {
+	g, opts := s.Grid, s.Params.Motifs.options()
+	spans := []motif.Span{}
+	for _, c := range in.a.Cues {
+		spans = append(spans, motif.Span{Name: c.Name, Start: c.Start, End: c.End})
 	}
-	beatChroma := make([][12]float64, len(g.Beats))
-	for i := range beatChroma {
-		c := f.harmony(g.BeatStart(i), g.BeatStart(i+1))
-		if f.meanDB("other", g.BeatStart(i), g.BeatStart(i+1)) >= s.Params.Chords.GateDB {
-			beatChroma[i] = c
+	beatChroma := make([][12]float64, len(beats))
+	for i, w := range beats {
+		if w.LevelDB >= s.Params.Chords.GateDB {
+			beatChroma[i] = w.Chroma
 		}
 	}
-	chroma := FindChromaMotifs(beatChroma, g, p)
-	all := []Motif{}
+	chroma, err := motif.FindChromaMotifs(beatChroma, g.Grid, opts...)
+	if err != nil {
+		return err
+	}
+	all := []motif.Motif{}
 	for _, src := range []struct {
 		name, track string
 		notes       []StoryNote
 	}{{"lead", "other", s.Lead.Clean}, {"bass", "bass", s.Bass.Clean}} {
-		for _, m := range FindNoteMotifs(src.notes, g, src.name, p) {
-			Corroborate(&m, chroma, g.BeatSeconds, p.ConfirmShare)
-			Score(&m, src.notes, spans, f.energy(src.track), g, p)
-			all = append(all, m)
+		notes := cleanNotes(src.notes)
+		found, err := motif.FindNoteMotifs(notes, g.Grid, src.name, opts...)
+		if err != nil {
+			return err
+		}
+		for i := range found {
+			if err := motif.Corroborate(&found[i], chroma, g.Grid, opts...); err != nil {
+				return err
+			}
+			if err := motif.Score(&found[i], notes, spans, in.energy(src.track), g.Grid, opts...); err != nil {
+				return err
+			}
+		}
+		all = append(all, found...)
+	}
+	for i := range chroma {
+		if err := motif.Score(&chroma[i], nil, spans, in.energy("other"), g.Grid, opts...); err != nil {
+			return err
 		}
 	}
-	for _, m := range chroma {
-		Score(&m, nil, spans, f.energy("other"), g, p)
-		all = append(all, m)
+	ranked, err := motif.Rank(append(all, chroma...), opts...)
+	if err != nil {
+		return err
 	}
-	s.Motifs = Rank(all, p)
-	type ranked struct {
+	s.Motifs = make([]Motif, len(ranked))
+	for i, m := range ranked {
+		s.Motifs[i] = toMotif(m)
+	}
+	type rankedID struct {
 		id   string
 		rank int
 	}
-	lm := []ranked{}
+	lm := []rankedID{}
 	for _, m := range s.Motifs {
 		if m.Leitmotif {
-			lm = append(lm, ranked{m.ID, m.Rank})
+			lm = append(lm, rankedID{m.ID, m.Rank})
 		}
 	}
 	sort.Slice(lm, func(i, j int) bool { return lm[i].rank < lm[j].rank })
@@ -393,35 +456,43 @@ func (s *Story) motifs(f features) {
 	for _, m := range lm {
 		s.Leitmotifs = append(s.Leitmotifs, m.id)
 	}
+	return nil
 }
 
-func (s *Story) bars(f features) {
+func (s *Story) bars(in input, active map[string]features.TrackActivity) error {
 	g := s.Grid
 	roles := map[string][]bool{}
 	for _, r := range s.Roles {
 		roles[r.Name] = r.BarActivity
 	}
+	spans := make([]harmony.Span, len(s.Bars))
+	for b := range spans {
+		spans[b] = harmony.Span{Start: g.BarStart(b), End: math.Min(g.Duration(), g.BarStart(b+1))}
+	}
+	windows, err := in.windows(spans, s.Bass.Clean)
+	if err != nil {
+		return err
+	}
 	for b := range s.Bars {
 		bar := &s.Bars[b]
-		start, end := g.BarStart(b), math.Min(g.Duration, g.BarStart(b+1))
+		start, end := spans[b].Start, spans[b].End
 		bar.Start, bar.End = r6(math.Max(0, start)), r6(end)
 		if b == 0 {
 			bar.Start = 0
 		}
-		bar.Cue = f.cueAt(start + g.BeatSeconds/2)
+		bar.Cue = in.cueAt(start + g.BeatSeconds()/2)
 		bar.Chords, bar.Roles, bar.Motifs = []string{}, []string{}, []string{}
 		for _, c := range s.Chords {
 			if c.Start < end-1e-6 && c.End > start+1e-6 {
 				bar.Chords = append(bar.Chords, c.Symbol)
 			}
 		}
-		pc := f.bassPC(start, end, s.Bass.Clean)
-		if pc != ([12]float64{}) {
+		if pc := windows[b].Bass; pc != ([12]float64{}) {
 			bar.BassRoot = PitchNames[argmax(pc)]
 		}
 		bar.StemEnergyDB = map[string]float64{}
-		for _, name := range []string{"drums", "bass", "other", "vocals"} {
-			bar.StemEnergyDB[name] = math.Round(barLevelDB(f.track(name), g, b)*100) / 100
+		for _, name := range stems {
+			bar.StemEnergyDB[name] = math.Round(active[name].SpanDB[b]*100) / 100
 		}
 		for _, r := range s.Roles {
 			if roles[r.Name][b] {
@@ -441,4 +512,5 @@ func (s *Story) bars(f features) {
 			}
 		}
 	}
+	return nil
 }

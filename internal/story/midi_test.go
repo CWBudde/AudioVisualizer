@@ -5,12 +5,15 @@ import (
 	"testing"
 
 	"github.com/cwbudde/AudioVisualizer/internal/audioanalysis"
-	"github.com/cwbudde/AudioVisualizer/internal/smf"
+	"github.com/cwbudde/midi/smf"
 )
 
 func TestMIDITicksAndDrums(t *testing.T) {
 	for _, aligned := range []bool{false, true} {
-		g := NewGrid(audioanalysis.Rhythm{BPM: 105, BeatOrigin: 0.038}, 10)
+		g, err := NewGrid(audioanalysis.Rhythm{BPM: 105, BeatOrigin: 0.038}, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
 		s := &Story{Grid: g, Key: KeyEstimate{Tonic: 7, Mode: "major"}}
 		s.Lead.Clean = []StoryNote{{Slot: 4, Slots: 2, MIDI: 67, Strength: 1, Voice: "lead"}, {Slot: 9, Slots: 1, MIDI: 71, Strength: 0.3, Voice: "arp"}}
 		drums := []audioanalysis.Event{{Time: 1, Strength: 1, Kind: "kick"}, {Time: 1.5, Strength: 1, Kind: "snare"}, {Time: 2, Strength: 1, Kind: "hat"}}

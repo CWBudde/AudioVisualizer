@@ -39,23 +39,7 @@ func AnalyzeMelody(a *Audio, onsets []Event, opts ...melody.Option) (*Melody, er
 	}
 	m := &Melody{Pitch: r.Pitch, Voicing: r.Voicing, Chroma: r.Chroma, Notes: make([]Note, len(r.Notes))}
 	for i, n := range r.Notes {
-		m.Notes[i] = Note(n)
+		m.Notes[i] = Note(n) // Note mirrors melody.Note field for field
 	}
 	return m, nil
-}
-
-// BassMelodyOptions retunes the tracker for a bass line: a long FFT resolves
-// semitones near 40 Hz, and notes are longer and snap further to onsets.
-func BassMelodyOptions() []melody.Option {
-	return []melody.Option{
-		melody.WithFFTSize(8192),
-		melody.WithMIDIRange(28, 60),
-		melody.WithFrequencyRange(30, 1200),
-		melody.WithHarmonics(6, 0.8),
-		melody.WithVoicingThreshold(0.3),
-		melody.WithSmoothing(0.04),
-		melody.WithNoteMinDuration(0.10),
-		melody.WithNoteJump(0.8, 0.05),
-		melody.WithOnsetSnap(0.06),
-	}
 }

@@ -84,7 +84,7 @@ type CompactChord struct {
 // leitmotif whose occurrence contains them; a bar's chord is the one
 // sounding longest in it.
 func (s *Story) Compact(sourceSHA256 string) CompactStory {
-	c := CompactStory{SchemaVersion: 1, SourceSHA256: sourceSHA256, BPM: r6(s.Grid.BPM), BeatOrigin: r6(s.Grid.OriginSeconds),
+	c := CompactStory{SchemaVersion: 1, SourceSHA256: sourceSHA256, BPM: r6(s.Grid.BPM()), BeatOrigin: r6(s.Grid.Origin()),
 		Key: CompactKey{s.Key.Name, s.Key.Tonic, s.Key.Mode, s.Key.RelativeAmbiguous}, Leitmotifs: []CompactMotif{}}
 	for _, sec := range s.Sections {
 		c.Sections = append(c.Sections, CompactSection{sec.Label, sec.Start, sec.End, sec.FirstBar, sec.LastBar, sec.Cue})
@@ -111,9 +111,9 @@ func (s *Story) Compact(sourceSHA256 string) CompactStory {
 			if m.ID != id {
 				continue
 			}
-			cm := CompactMotif{ID: m.ID, Role: m.Role, Rank: m.Rank, PrototypeMIDI: m.PrototypeMIDI}
+			cm := CompactMotif{ID: m.ID, Role: string(m.Role), Rank: m.Rank, PrototypeMIDI: m.PrototypeMIDI}
 			for _, o := range m.Occurrences {
-				cm.Occurrences = append(cm.Occurrences, CompactOccurrence{o.Start, o.End, o.Transposition, o.Similarity, o.Variant})
+				cm.Occurrences = append(cm.Occurrences, CompactOccurrence{o.Start, o.End, o.Transposition, o.Similarity, string(o.Variant)})
 			}
 			c.Leitmotifs = append(c.Leitmotifs, cm)
 		}
@@ -121,7 +121,7 @@ func (s *Story) Compact(sourceSHA256 string) CompactStory {
 	notes := func(in []StoryNote, motif map[int]string) []CompactNote {
 		out := []CompactNote{}
 		for i, n := range in {
-			out = append(out, CompactNote{r6(n.Start), r6(n.End), n.MIDI, velocity(n.Strength), n.Voice, motif[i]})
+			out = append(out, CompactNote{r6(n.Start), r6(n.End), n.MIDI, velocity(n.Strength), string(n.Voice), motif[i]})
 		}
 		return out
 	}
