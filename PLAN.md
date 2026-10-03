@@ -1,6 +1,6 @@
 # PixelParade — music visualizer production plan
 
-Prepared 2026-10-03. **Preparation and visual implementation are complete. Four preview clips have been reviewed; the full master is rendering.**
+Completed 2026-10-03. **Preparation, Remotion implementation, previews, full MP4 rendering, and final verification are complete.**
 
 ## 1. Deliverable and creative direction
 
@@ -10,6 +10,9 @@ The initial preparation milestone ended with copied audio, local stems, reproduc
 
 ### Completed artifacts
 
+- Full master: [`out/PixelParade.mp4`](out/PixelParade.mp4), 1080×1080 at 60 fps, all 5168 frames, H.264 `yuv420p` / BT.709 and stereo AAC.
+- Four representative clips in `out/previews/`; reviewed scene contact sheet: [`out/storyboard.jpg`](out/storyboard.jpg).
+- Final export/audio/timestamp checks: [`analysis/render-validation.json`](analysis/render-validation.json), stream probe: [`analysis/render-probe.json`](analysis/render-probe.json), and resumable render provenance: [`analysis/render-production.json`](analysis/render-production.json).
 - Original soundtrack: [`public/audio/PixelParade.wav`](public/audio/PixelParade.wav).
 - Four float32 stereo stems: `analysis/stems/htdemucs/PixelParade/{drums,bass,other,vocals}.wav`.
 - Full 100 Hz analysis and cue data: [`analysis/features.json`](analysis/features.json).
@@ -185,6 +188,8 @@ Twenty scene frames were captured at full resolution and reviewed in `out/storyb
 
 The four full-resolution previews are in `out/previews/`: `01-opening.mp4`, `02-breakdown-return.mp4`, `03-finale-entrance.mp4`, and `04-ending.mp4`. Their dimensions, frame counts, frame rates, and audio formats pass `scripts/inspect-previews.ts`; the probe records are in `analysis/preview-validation.json`. Encoded opening, breakdown, finale, and ending frames were visually inspected. One interrupted preview job was resumed; all four clips completed successfully.
 
+Long render jobs were externally terminated in this environment, including a single master job at about 59%. Production now uses `scripts/render-master.ts`: nine 600-frame sections (the last has 368 frames), each saved and format-checked separately. A fingerprint covers source code, soundtrack, controls, locked dependencies, and render settings; a resumed job reuses only matching completed sections. Assembly copies video streams without another encode and encodes the complete original WAV to AAC once. Final verification checks all 5168 frames and waveform alignment across the joined file.
+
 Production commands:
 
 ```sh
@@ -197,6 +202,8 @@ rtk proxy sh scripts/go.sh run ./cmd/verifyrender
 ```
 
 `cmd/verifyrender` checks the master stream format, 5168 frames, fast-start MP4 boxes, complete decode, audio duration, and beginning/middle/end/tail waveform correlation, gain, and lag against the original WAV. It writes `analysis/render-probe.json` and `analysis/render-validation.json`.
+
+The completed master passed every export check. All 5168 decoded frame timestamps agree with `frame / 60` within 0.000334 ms, including section joins. Beginning, middle, end, and tail audio comparisons each detect **0.000 ms lag**, with correlations **0.999842–0.999982**. Whole-file RMS differs by **−0.014851 dB** after AAC encoding. Decoded AAC lasts 86.122667 seconds, including 2.667 ms of codec padding; the original's complete 86.120-second tail is present. Waveform comparisons use the Go loader's aligned 24 kHz channel data; whole-file RMS is measured before resampling. Verification uses a temporary PCM16 decode to avoid the sibling WAV decoder's unsupported extensible-float header; this does not change the deliverable. A known-delay/gain test validates the verification clock independently of retained 48 kHz source metadata. Full decode, final BT.709 frame inspection, and the intentional black final frame all pass.
 
 ### Runtime and architecture
 
@@ -263,9 +270,9 @@ Native Chrome screenshot attempts failed during preparation with sandbox socket/
 - [x] Representative clips align impacts with validated events within one 60 fps frame; measured pauses suppress emission and impulses.
 - [x] Opening, two breakdowns, returns, finale, and ending have visibly distinct choreography.
 - [x] No text appears; central geometry stays legible and the finale earns its higher density.
-- [ ] Full master contains the complete soundtrack at original timing/gain and no unexplained blank frames or missing assets.
-- [ ] FFprobe verifies 1080×1080, 60 fps, 5168 frames, H.264, `yuv420p`, and stereo AAC.
-- [ ] Final review checks sync at beginning/middle/end, transition continuity, clipping at canvas edges, neon compression quality, and the last frame.
+- [x] Full master contains the complete soundtrack at original timing/gain and no unexplained blank frames or missing assets.
+- [x] FFprobe verifies 1080×1080, 60 fps, 5168 frames, H.264, `yuv420p`, and stereo AAC.
+- [x] Final review checks sync at beginning/middle/end, transition continuity, clipping at canvas edges, neon compression quality, and the last frame.
 
 ## References
 

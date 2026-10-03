@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"strconv"
 
 	"github.com/cwbudde/AudioVisualizer/internal/audioanalysis"
 )
@@ -50,9 +51,10 @@ func stats(a, b *audioanalysis.Audio, start, end, lag int) (float64, float64) {
 	return ab / math.Sqrt(aa*bb), 10 * math.Log10(bb/aa)
 }
 func compare(a, b *audioanalysis.Audio, start, end float64) window {
-	i, j := int(start*float64(a.Source.SampleRate)), int(end*float64(a.Source.SampleRate))
+	// Load aligns channel data at the analysis rate; source metadata retains 48kHz.
+	i, j := int(start*float64(audioanalysis.SampleRate)), int(end*float64(audioanalysis.SampleRate))
 	best, lag := -1.0, 0
-	for offset := -960; offset <= 960; offset += 16 {
+	for offset := -480; offset <= 480; offset += 16 {
 		c, _ := stats(a, b, i, j, offset)
 		if c > best {
 			best, lag = c, offset
@@ -66,7 +68,7 @@ func compare(a, b *audioanalysis.Audio, start, end float64) window {
 		}
 	}
 	c, gain := stats(a, b, i, j, lag)
-	return window{start, end, float64(lag) * 1000 / float64(a.Source.SampleRate), c, gain}
+	return window{start, end, float64(lag) * 1000 / float64(audioanalysis.SampleRate), c, gain}
 }
 
 // Parse top-level ISO BMFF boxes rather than looking for strings in compressed data.
@@ -140,7 +142,9 @@ func run() error {
 		return fmt.Errorf("MP4 not fast start")
 	}
 	decoded := ".cache/rendered-audio.wav"
-	if output, err := exec.Command("ffmpeg", "-v", "error", "-y", "-i", path, "-vn", "-acodec", "pcm_f32le", decoded).CombinedOutput(); err != nil {
+	// Standard PCM16 avoids this WAV decoder's unsupported extensible float header.
+	// This is a verification scratch file; the MP4 and original remain untouched.
+	if output, err := exec.Command("ffmpeg", "-v", "error", "-y", "-i", path, "-vn", "-acodec", "pcm_s16le", decoded).CombinedOutput(); err != nil {
 		return fmt.Errorf("decode audio: %v: %s", err, output)
 	}
 	a, err := audioanalysis.Load("public/audio/PixelParade.wav")
@@ -154,6 +158,10 @@ func run() error {
 	if b.Source.SampleRate != a.Source.SampleRate || len(b.Channels) != len(a.Channels) || math.Abs(b.Source.Duration-a.Source.Duration) > .04 {
 		return fmt.Errorf("audio duration or format mismatch")
 	}
+	globalGain := b.Source.RMSDB - a.Source.RMSDB
+	if math.Abs(globalGain) > .2 {
+		return fmt.Errorf("whole-file gain mismatch: %.3f dB", globalGain)
+	}
 	windows := []window{compare(a, b, 2, 12), compare(a, b, 35, 45), compare(a, b, 72, 82), compare(a, b, 82.3, 86.12)}
 	for _, w := range windows {
 		if w.Correlation < .98 || math.Abs(w.GainDB) > .2 || math.Abs(w.LagMS) > 1000.0/60 {
@@ -163,14 +171,44 @@ func run() error {
 	if output, err := exec.Command("ffmpeg", "-v", "error", "-i", path, "-f", "null", "-").CombinedOutput(); err != nil || len(output) > 0 {
 		return fmt.Errorf("full decode: %v: %s", err, output)
 	}
+	frameData, err := exec.Command("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "frame=best_effort_timestamp_time", "-of", "json", path).Output()
+	if err != nil {
+		return err
+	}
+	var timestamps struct {
+		Frames []struct {
+			Time string `json:"best_effort_timestamp_time"`
+		} `json:"frames"`
+	}
+	if err := json.Unmarshal(frameData, &timestamps); err != nil {
+		return err
+	}
+	if len(timestamps.Frames) != 5168 {
+		return fmt.Errorf("decoded frame count: %d", len(timestamps.Frames))
+	}
+	var maximumClockError float64
+	for i, frame := range timestamps.Frames {
+		t, err := strconv.ParseFloat(frame.Time, 64)
+		if err != nil {
+			return err
+		}
+		e := math.Abs(t - float64(i)/60)
+		maximumClockError = math.Max(maximumClockError, e)
+		if e > .000001 {
+			return fmt.Errorf("discontinuous video clock at frame %d: %f", i, t)
+		}
+	}
 	result := struct {
-		VideoFormat    string   `json:"videoFormat"`
-		FastStart      bool     `json:"fastStart"`
-		SourceSeconds  float64  `json:"sourceSeconds"`
-		DecodedSeconds float64  `json:"decodedAudioSeconds"`
-		Windows        []window `json:"audioComparisons"`
-		FullDecode     string   `json:"fullDecode"`
-	}{"1080x1080 / 60 fps / 5168 frames / H.264 / yuv420p / AAC stereo 48kHz", fast, a.Source.Duration, b.Source.Duration, windows, "passed"}
+		VideoFormat              string   `json:"videoFormat"`
+		FastStart                bool     `json:"fastStart"`
+		SourceSeconds            float64  `json:"sourceSeconds"`
+		DecodedSeconds           float64  `json:"decodedAudioSeconds"`
+		Windows                  []window `json:"audioComparisons"`
+		FullDecode               string   `json:"fullDecode"`
+		MaximumFrameClockErrorMS float64  `json:"maximumFrameClockErrorMS"`
+		WaveformComparisonRate   int      `json:"waveformComparisonSampleRate"`
+		GlobalGainDB             float64  `json:"wholeFileGainDB"`
+	}{"1080x1080 / 60 fps / 5168 frames / H.264 / yuv420p / AAC stereo 48kHz", fast, a.Source.Duration, b.Source.Duration, windows, "passed", maximumClockError * 1000, audioanalysis.SampleRate, globalGain}
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return err

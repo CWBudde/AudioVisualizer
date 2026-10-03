@@ -2,6 +2,8 @@
 
 A deterministic Remotion music visualizer, driven by locally separated stems and Go audio analysis. The master is a full-track, text-free neon geometric parade at 1080×1080 and 60 fps.
 
+Completed master: [out/PixelParade.mp4](out/PixelParade.mp4). Export checks confirm 5168 frames, continuous frame timestamps, complete decoding, stereo AAC, fast start, and zero detected audio lag in all comparison windows. Measurements are recorded in [analysis/render-validation.json](analysis/render-validation.json).
+
 ## Run
 
 ```sh
@@ -15,6 +17,8 @@ rtk proxy sh scripts/go.sh run ./cmd/verifyrender
 ```
 
 The render scripts compile their TypeScript orchestration with Bun and execute the Remotion renderer with Node. Outputs go into `out/`: `PixelParade.mp4`, four preview clips, and captured scene frames. The studio uses the original WAV and the exported compact controls; it does not require stem playback.
+
+The master renders in nine resumable sections under `out/segments/`. A source/settings fingerprint prevents mixing sections from different versions. Re-running `bun run render` verifies and reuses completed sections. Assembly copies the video streams and encodes the complete original WAV once. The render command then runs the Go output verifier automatically.
 
 The local renderer uses `.cache/browser/chrome-headless-shell-linux64/chrome-headless-shell`. To recreate that browser installation:
 

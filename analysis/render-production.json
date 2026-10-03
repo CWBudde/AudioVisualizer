@@ -1,0 +1,55 @@
+{
+  "signature": "308c57607f31f7a0832be0e245a64d4ceea2426bd3a2569614a2ad9dc4336562",
+  "settings": {
+    "codec": "h264",
+    "pixelFormat": "yuv420p",
+    "colorSpace": "bt709",
+    "crf": 18,
+    "x264Preset": "fast",
+    "fps": 60,
+    "width": 1080,
+    "height": 1080
+  },
+  "ranges": [
+    [
+      0,
+      599
+    ],
+    [
+      600,
+      1199
+    ],
+    [
+      1200,
+      1799
+    ],
+    [
+      1800,
+      2399
+    ],
+    [
+      2400,
+      2999
+    ],
+    [
+      3000,
+      3599
+    ],
+    [
+      3600,
+      4199
+    ],
+    [
+      4200,
+      4799
+    ],
+    [
+      4800,
+      5167
+    ]
+  ],
+  "directory": "out/segments/308c57607f31",
+  "originalAudio": "public/audio/PixelParade.wav",
+  "audioEncoding": "AAC stereo 48kHz 320k; one encode from source",
+  "assembly": "video stream copy; fast start"
+}
