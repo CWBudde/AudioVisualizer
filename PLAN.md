@@ -223,12 +223,12 @@ Review formation legibility, continuity, actual transient synchronization, and t
 
 ### Master export
 
-Output: `out/PixelParade.mp4`. Use H.264, `yuv420p`, CRF 18, AAC stereo at 320 kbps, two render workers initially, and MP4 fast start. Export all 5168 frames; the video ends about 13 ms after the WAV. Do not trim, retime, normalize, or fade the audio. The visual tail follows the source's natural ending.
+Output: `out/PixelParade.mp4`. Use H.264, `yuv420p`, BT.709 limited range, CRF 18 with the `fast` x264 preset, AAC stereo at 320 kbps, two render workers, and MP4 fast start. Export all 5168 frames; the video ends about 13 ms after the WAV. Do not trim, retime, normalize, or fade the audio. The visual tail follows the source's natural ending.
 
 Once scripts exist, the equivalent render command is:
 
 ```sh
-rtk proxy bunx remotion render src/index.ts PixelParadeSquare out/PixelParade.mp4 --codec=h264 --pixel-format=yuv420p --crf=18 --audio-codec=aac --audio-bitrate=320k --concurrency=2
+rtk proxy bunx remotion render src/index.ts PixelParadeSquare out/PixelParade.mp4 --codec=h264 --pixel-format=yuv420p --color-space=bt709 --x264-preset=fast --crf=18 --audio-codec=aac --audio-bitrate=320k --concurrency=2
 ```
 
 Ensure fast start through the supported renderer configuration or a final lossless `ffmpeg -c copy -movflags +faststart` remux.

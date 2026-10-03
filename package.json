@@ -10,8 +10,9 @@
     "validate": "bun scripts/validate.ts",
     "preflight": "bun build scripts/preflight.ts --target=node --packages=external --outfile=.cache/preflight.mjs && node .cache/preflight.mjs",
     "render:stills": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs stills",
-    "render:preview": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs preview",
-    "render": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs master"
+    "render:preview": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs preview && bun scripts/inspect-previews.ts",
+    "verify:render": "sh scripts/go.sh run ./cmd/verifyrender",
+    "render": "bun run typecheck && bun run validate && bun build scripts/render-master.ts --target=node --packages=external --outfile=.cache/master.mjs && node .cache/master.mjs all && bun run verify:render"
   },
   "dependencies": {
     "@remotion/bundler": "4.0.532",
