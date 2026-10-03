@@ -6,9 +6,10 @@
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "analyze": "sh scripts/go.sh run ./cmd/analyze && sh scripts/go.sh run ./cmd/controls",
+    "story": "sh scripts/go.sh run ./cmd/story",
     "typecheck": "tsc --noEmit",
     "validate": "bun scripts/validate.ts",
-    "validate:all": "PP_VERSION=v1 bun scripts/validate.ts && PP_VERSION=v2 bun scripts/validate.ts",
+    "validate:all": "PP_VERSION=v1 bun scripts/validate.ts && PP_VERSION=v2 bun scripts/validate.ts && PP_VERSION=v3 bun scripts/validate.ts",
     "preflight": "bun build scripts/preflight.ts --target=node --packages=external --outfile=.cache/preflight.mjs && node .cache/preflight.mjs",
     "render:stills": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs stills",
     "render:preview": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs preview && bun scripts/inspect-previews.ts",
@@ -16,18 +17,22 @@
     "render": "bun run typecheck && bun run validate && bun build scripts/render-master.ts --target=node --packages=external --outfile=.cache/master.mjs && node .cache/master.mjs all && bun run verify:render"
   },
   "dependencies": {
+    "@react-three/fiber": "9.8.1",
     "@remotion/bundler": "4.0.532",
     "@remotion/cli": "4.0.532",
     "@remotion/media": "4.0.532",
     "@remotion/renderer": "4.0.532",
+    "@remotion/three": "4.0.532",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "remotion": "4.0.532"
+    "remotion": "4.0.532",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@types/bun": "1.3.10",
     "@types/react": "19.2.0",
     "@types/react-dom": "19.2.0",
+    "@types/three": "0.186.0",
     "typescript": "5.9.3"
   }
 }

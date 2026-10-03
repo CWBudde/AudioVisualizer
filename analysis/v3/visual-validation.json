@@ -1,0 +1,91 @@
+{
+  "version": "v3",
+  "sourceSHA256": "20a7f80e5de0e2052071fcba6a838249437d60deb42991b42ed03f1cd955066d",
+  "totalFrames": 5168,
+  "fps": 60,
+  "maximumDrumEventDelayMS": 16.66666666666572,
+  "maximumNoteDelayMS": 16.66666666666572,
+  "eventsChecked": 233,
+  "notesChecked": 515,
+  "silenceSuppression": "passed",
+  "timeline": {
+    "entries": 8,
+    "kinds": [
+      "burn",
+      "wash",
+      "dissolve",
+      "iris"
+    ],
+    "transitions": [
+      {
+        "into": "ember-field",
+        "kind": "burn",
+        "start": 7.454,
+        "seconds": 1.714
+      },
+      {
+        "into": "tunnel",
+        "kind": "wash",
+        "start": 17.739,
+        "seconds": 1.143
+      },
+      {
+        "into": "void",
+        "kind": "dissolve",
+        "start": 34.314,
+        "seconds": 2.286
+      },
+      {
+        "into": "tunnel",
+        "kind": "wash",
+        "start": 43.257,
+        "seconds": 1.143
+      },
+      {
+        "into": "ember-field",
+        "kind": "dissolve",
+        "start": 52.614,
+        "seconds": 2.286
+      },
+      {
+        "into": "bloom",
+        "kind": "iris",
+        "start": 62.3,
+        "seconds": 1.7
+      },
+      {
+        "into": "void",
+        "kind": "dissolve",
+        "start": 82.3,
+        "seconds": 2.286
+      }
+    ]
+  },
+  "story": "public/analysis/story.json",
+  "bars": 38,
+  "leitmotifs": [
+    {
+      "id": "M1",
+      "role": "ostinato",
+      "occurrences": 9
+    },
+    {
+      "id": "M2",
+      "role": "ostinato",
+      "occurrences": 5
+    },
+    {
+      "id": "M4",
+      "role": "theme",
+      "occurrences": 3
+    },
+    {
+      "id": "M5",
+      "role": "ostinato",
+      "occurrences": 8
+    }
+  ],
+  "deterministicSeeks": "passed",
+  "finiteFrameState": "passed",
+  "forbiddenTokens": "none"
+}

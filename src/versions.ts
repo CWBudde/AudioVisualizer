@@ -1,5 +1,5 @@
 // Plain constants shared by the Remotion root and the node scripts; keep this free of JSON and React imports.
-export const VERSIONS = ['v1', 'v2'] as const;
+export const VERSIONS = ['v1', 'v2', 'v3'] as const;
 export type Version = typeof VERSIONS[number];
 export const DEFAULT_VERSION: Version = 'v2';
 export const compositionId = (v: Version) => `PixelParade-${v}`;

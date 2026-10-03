@@ -2,7 +2,7 @@ import {useLayoutEffect, useRef} from 'react';
 import {createProgram, createTarget} from './program';
 import type {Program, Target} from './program';
 import {SCENE} from './shaders/scene.glsl';
-import {COMPOSITE, DOWN, UP} from './shaders/post.glsl';
+import {COMPOSITE, DOWN, UP} from '../../shared/glsl/bloom';
 import type {FrameUniforms} from './uniforms';
 
 const SIZE = 1080, BLOOM_LEVELS = 5, BLOOM_THRESHOLD = .55;

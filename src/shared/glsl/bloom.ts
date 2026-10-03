@@ -1,3 +1,11 @@
+// Shared post chain (v2 raw WebGL2, v3 via three RawShaderMaterial). The exported v2 strings must stay byte-identical.
+const VERSION = '#version 300 es\n';
+/** Strip the version line; three prepends its own for RawShaderMaterial with glslVersion GLSL3. */
+export const raw = (source: string) => source.startsWith(VERSION) ? source.slice(VERSION.length) : source;
+
+export const HASH = `float hash(vec2 p) {p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y);}`;
+export const ACES = `vec3 aces(vec3 x) {return clamp(x * (2.51 * x + .03) / (x * (2.43 * x + .59) + .14), 0., 1.);}`;
+
 // Dual-filter bloom (downsample chain, then tent upsample adding each level back).
 export const DOWN = `#version 300 es
 precision highp float;
@@ -35,8 +43,8 @@ out vec4 o;
 uniform sampler2D uScene, uBloom;
 uniform vec2 uRes;
 uniform float uBloomAmount, uAberration, uSaturation, uBrightness, uGrain, uFrame;
-float hash(vec2 p) {p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y);}
-vec3 aces(vec3 x) {return clamp(x * (2.51 * x + .03) / (x * (2.43 * x + .59) + .14), 0., 1.);}
+${HASH}
+${ACES}
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes, c = uv - .5;
   vec2 shift = c * uAberration * .012 * (.3 + 2. * dot(c, c));

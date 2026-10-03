@@ -3,13 +3,14 @@ import {bundle} from '@remotion/bundler';
 import {ensureBrowser, openBrowser, renderMedia, selectComposition} from '@remotion/renderer';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import {existsSync} from 'node:fs';
 import {mkdir, readFile, readdir, writeFile, rename} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {FPS, FRAMES, SIZE, compositionId} from '../src/versions';
 import type {Version} from '../src/versions';
 import {pathsFor, versionFromEnv} from './version';
 
-const CHUNK = 600;
+const CHUNK = 600, STORY = 'public/analysis/story.json';
 const version = versionFromEnv(), paths = pathsFor(version);
 // WebGL versions need ANGLE for a GPU-backed headless context; the setting is part of the signature.
 const chromiumOptions = {gl: 'angle'} as const;
@@ -29,6 +30,8 @@ const signature = async () => {
   const hash = createHash('sha256'); hash.update(JSON.stringify(settings));
   for (const file of await sourceFiles(version)) {hash.update(file + '\0'); hash.update(await readFile(file));}
   hash.update(await readFile('public/analysis/controls.json'));
+  // v3 loads its story through calculateMetadata; the beat-grid fallback is a different video.
+  if (version === 'v3') hash.update(existsSync(STORY) ? await readFile(STORY) : 'story:missing');
   hash.update(await readFile('public/audio/PixelParade.wav'));
   hash.update(await readFile('scripts/render-master.ts'));
   hash.update(await readFile('scripts/version.ts'));
