@@ -173,3 +173,23 @@ func TestDownbeatFollowsAccentedBeat(t *testing.T) {
 		t.Fatalf("downbeat index %d, want 1", got)
 	}
 }
+
+func TestBassOptionsTrackLowNotes(t *testing.T) {
+	notes := []synthNote{{0.20, 0.50, 31}, {0.55, 0.85, 38}, {0.90, 1.20, 43}, {1.25, 1.55, 36}}
+	x := make([]float64, 2*SampleRate)
+	for _, n := range notes {
+		addHarmonicNote(x, n)
+	}
+	m, err := AnalyzeMelody(&Audio{Source: Source{Duration: 2}, Channels: [][]float64{x}}, nil, BassMelodyOptions()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Notes) != len(notes) {
+		t.Fatalf("expected %d notes, got %+v", len(notes), m.Notes)
+	}
+	for i, want := range notes {
+		if got := m.Notes[i]; got.MIDI != want.midi || math.Abs(got.Start-want.start) > 0.05 {
+			t.Fatalf("note %d: %+v, want %+v", i, got, want)
+		}
+	}
+}

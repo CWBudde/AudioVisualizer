@@ -23,7 +23,8 @@ type Melody struct {
 
 // AnalyzeMelody tracks the predominant pitch by harmonic summation. Onsets,
 // when given, refine note starts and split re-articulated repeated notes.
-func AnalyzeMelody(a *Audio, onsets []Event) (*Melody, error) {
+// Options are applied after the default hop and onsets.
+func AnalyzeMelody(a *Audio, onsets []Event, opts ...melody.Option) (*Melody, error) {
 	mono, err := melody.Downmix(a.Channels)
 	if err != nil {
 		return nil, err
@@ -32,7 +33,7 @@ func AnalyzeMelody(a *Audio, onsets []Event) (*Melody, error) {
 	for i, e := range onsets {
 		times[i] = e.Time
 	}
-	r, err := melody.Analyze(mono, SampleRate, melody.WithHop(Hop), melody.WithOnsets(times))
+	r, err := melody.Analyze(mono, SampleRate, append([]melody.Option{melody.WithHop(Hop), melody.WithOnsets(times)}, opts...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -41,4 +42,20 @@ func AnalyzeMelody(a *Audio, onsets []Event) (*Melody, error) {
 		m.Notes[i] = Note(n)
 	}
 	return m, nil
+}
+
+// BassMelodyOptions retunes the tracker for a bass line: a long FFT resolves
+// semitones near 40 Hz, and notes are longer and snap further to onsets.
+func BassMelodyOptions() []melody.Option {
+	return []melody.Option{
+		melody.WithFFTSize(8192),
+		melody.WithMIDIRange(28, 60),
+		melody.WithFrequencyRange(30, 1200),
+		melody.WithHarmonics(6, 0.8),
+		melody.WithVoicingThreshold(0.3),
+		melody.WithSmoothing(0.04),
+		melody.WithNoteMinDuration(0.10),
+		melody.WithNoteJump(0.8, 0.05),
+		melody.WithOnsetSnap(0.06),
+	}
 }
