@@ -2,19 +2,10 @@ module github.com/cwbudde/AudioVisualizer
 
 go 1.26.0
 
-replace github.com/cwbudde/algo-dsp => ../algo-dsp
-
-replace github.com/cwbudde/algo-fft => ../algo-fft
-
-replace github.com/cwbudde/algo-approx => ../algo-approx
-
-replace github.com/cwbudde/algo-vecmath => ../algo-vecmath
-
-replace github.com/cwbudde/wav => ../wav
-
 require (
-	github.com/cwbudde/algo-dsp v0.0.0-00010101000000-000000000000
-	github.com/cwbudde/wav v0.0.0-00010101000000-000000000000
+	github.com/cwbudde/algo-dsp v0.8.0
+	github.com/cwbudde/midi v0.1.0
+	github.com/cwbudde/wav v0.1.3
 )
 
 require (

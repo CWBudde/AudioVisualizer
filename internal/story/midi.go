@@ -6,18 +6,8 @@ import (
 	"sort"
 
 	"github.com/cwbudde/AudioVisualizer/internal/audioanalysis"
-	"github.com/cwbudde/AudioVisualizer/internal/smf"
+	"github.com/cwbudde/midi/smf"
 )
-
-// Tick maps seconds to MIDI ticks at the grid tempo. By default MIDI time 0
-// is audio time 0, so the file lines up with the WAV in a DAW; gridAligned
-// moves the first beat to tick 0 instead.
-func (g Grid) Tick(seconds float64, gridAligned bool) int {
-	if gridAligned {
-		seconds -= g.OriginSeconds
-	}
-	return int(math.Round(seconds * g.BPM / 60 * smf.PPQ))
-}
 
 func velocity(strength float64) int {
 	return int(math.Round(40 + 87*math.Min(1, math.Max(0, (strength-0.3)/0.7))))
@@ -28,10 +18,17 @@ func velocity(strength float64) int {
 // on channel 10 and one motif lane per leitmotif on channel 16.
 func (s *Story) MIDI(drums []audioanalysis.Event, gridAligned bool) []*smf.Track {
 	g := s.Grid
-	tick := func(t float64) int { return g.Tick(t, gridAligned) }
+	// By default MIDI time 0 is audio time 0, so the file lines up with the
+	// WAV in a DAW; gridAligned moves the first beat to tick 0 instead.
+	tick := func(t float64) int {
+		if gridAligned {
+			t -= g.Origin()
+		}
+		return g.Tick(t, smf.PPQ)
+	}
 	conductor := &smf.Track{}
 	conductor.Name("PixelParade story")
-	conductor.Tempo(0, g.BPM)
+	conductor.Tempo(0, g.BPM())
 	conductor.TimeSignature(0, 4, 4)
 	conductor.KeySignature(0, s.Key.Sharps(), s.Key.Mode == "minor")
 	for _, c := range s.Cues {

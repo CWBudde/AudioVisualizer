@@ -26,12 +26,16 @@ func EstimateRhythm(t *Track, preferredBPM float64) (Rhythm, error) {
 	// Fit beat phase using positive changes in the drum stem's low band, favoring
 	// kick-like activity over snare/hi-hat subdivisions without labeling events.
 	phase := rhythm.FitBeatPhase(t.Bands[0], timing, tempo.BPM, t.Source.Duration)
+	beats, err := rhythm.BeatGrid(phase, tempo.BPM, t.Source.Duration)
+	if err != nil {
+		return Rhythm{}, err
+	}
 	times := make([]float64, len(t.Events))
 	for i, e := range t.Events {
 		times[i] = e.Time
 	}
 	return Rhythm{BPM: tempo.BPM, BeatOrigin: phase, Meter: "4/4 inferred from ~9.14 s phrase changes; downbeat index unverified", Candidates: candidates,
-		Beats:              rhythm.BeatGrid(phase, tempo.BPM, t.Source.Duration),
+		Beats:              beats,
 		MedianOnsetErrorMS: rhythm.GridError(times, phase, tempo.BPM, 4) * 1000,
 		Evidence:           fmt.Sprintf("Refined explicit %.1f BPM mix-analysis prior using multibeat spectral-novelty correlation %.4f; phase fitted to low-band drum attacks", preferredBPM, tempo.Correlation)}, nil
 }

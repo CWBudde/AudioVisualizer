@@ -4,6 +4,8 @@ import (
 	"math"
 	"sort"
 	"testing"
+
+	"github.com/cwbudde/algo-dsp/measure/music/melody"
 )
 
 type synthNote struct {
@@ -174,13 +176,13 @@ func TestDownbeatFollowsAccentedBeat(t *testing.T) {
 	}
 }
 
-func TestBassOptionsTrackLowNotes(t *testing.T) {
+func TestBassPresetTracksLowNotes(t *testing.T) {
 	notes := []synthNote{{0.20, 0.50, 31}, {0.55, 0.85, 38}, {0.90, 1.20, 43}, {1.25, 1.55, 36}}
 	x := make([]float64, 2*SampleRate)
 	for _, n := range notes {
 		addHarmonicNote(x, n)
 	}
-	m, err := AnalyzeMelody(&Audio{Source: Source{Duration: 2}, Channels: [][]float64{x}}, nil, BassMelodyOptions()...)
+	m, err := AnalyzeMelody(&Audio{Source: Source{Duration: 2}, Channels: [][]float64{x}}, nil, melody.BassPreset()...)
 	if err != nil {
 		t.Fatal(err)
 	}
