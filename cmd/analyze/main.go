@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	aa "github.com/cwbudde/AudioVisualizer/internal/audioanalysis"
 )
@@ -35,17 +33,12 @@ func run() error {
 		return err
 	}
 	a := &aa.Analysis{SchemaVersion: 2, SampleRate: aa.SampleRate, FFTSize: aa.FFTSize, Hop: aa.Hop, BandEdges: aa.BandEdges, SpectrogramBins: aa.SpectrogramBins, Tracks: map[string]*aa.Track{}, Provenance: map[string]string{"go": runtime.Version(), "normalization": "per-track active-sample 95th percentile, -80 dBFS gate, attack 10 ms, release 150 ms (energy) / 120 ms (bands)", "resampling": "algo-dsp QualityBest, tail flush, fractional FIR delay compensation", "stemMode": "required"}}
-	for _, name := range []string{"algo-dsp", "algo-fft", "algo-vecmath", "algo-approx", "wav"} {
-		v, err := exec.Command("git", "-C", "../"+name, "rev-parse", "HEAD").Output()
-		if err != nil {
-			return fmt.Errorf("provenance %s: %w", name, err)
-		}
-		a.Provenance[name] = strings.TrimSpace(string(v))
-		dirty, err := exec.Command("git", "-C", "../"+name, "status", "--porcelain").Output()
-		if err != nil {
-			return err
-		}
-		a.Provenance[name+"Dirty"] = fmt.Sprint(len(dirty) > 0)
+	mods, err := aa.ModuleProvenance("algo-dsp", "algo-fft", "algo-vecmath", "algo-approx", "wav")
+	if err != nil {
+		return err
+	}
+	for k, v := range mods {
+		a.Provenance[k] = v
 	}
 	mix, err := aa.Load(*input)
 	if err != nil {

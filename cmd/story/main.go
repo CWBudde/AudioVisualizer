@@ -11,10 +11,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/cwbudde/AudioVisualizer/internal/audioanalysis"
 	"github.com/cwbudde/AudioVisualizer/internal/story"
@@ -139,8 +137,12 @@ func analyze(o options) (*story.Story, *audioanalysis.Analysis, error) {
 		{Name: "bass", Path: filepath.Join(o.stems, "bass.wav"), SHA256: bass.Source.SHA256},
 	}
 	s.Provenance = map[string]string{"go": runtime.Version(), "bassMelody": "audioanalysis.AnalyzeMelody with melody.BassPreset and bass-stem onsets", "lead": "features.json tracks.other.melody"}
-	if v, err := exec.Command("git", "-C", "../algo-dsp", "rev-parse", "HEAD").Output(); err == nil {
-		s.Provenance["algo-dsp"] = strings.TrimSpace(string(v))
+	mods, err := audioanalysis.ModuleProvenance("algo-dsp", "midi")
+	if err != nil {
+		return nil, nil, err
+	}
+	for k, v := range mods {
+		s.Provenance[k] = v
 	}
 	return s, &a, nil
 }
