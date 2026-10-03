@@ -1,30 +1,30 @@
-import {Embers} from '../elements/Embers';
-import type {SceneProps} from '../engine/frame';
-import {lightRamp, PALETTE, scaleRGB} from '../engine/palette';
+import {Backdrop} from '../elements/Backdrop';
+import type {CameraPose, SceneProps} from '../engine/frame';
+import {followRig, RIGS} from '../world';
+import {GhostLantern} from '../world/GhostLantern';
+import {HeraldBeams} from '../world/HeraldBeams';
+import {Plain} from '../world/Plain';
+import {Walkers} from '../world/Walkers';
+import {Wick} from '../world/Wick';
 import type {SceneDef} from './registry';
 
-const RINGS = 26, SPACING = 1.6, LENGTH = RINGS * SPACING;
-// Placeholder: glowing rings rushing past on the beat grid, fading into fog.
-const Tunnel = ({t, presence, controls: c, seed, light}: SceneProps) => {
-  const travel = c.beat * .9;
+// tunnel: instanced walls along the route, the crimson chevron, hammer and the ghost in the mouth (§4.5). Owned by WP4.
+// STUB (Phase 0): no walls yet; plain at .6, walkers, Wick, ghost, beams on the chase rig.
+const camera = ({t, world, controls: c}: SceneProps): CameraPose => {
+  const pose = followRig(world, RIGS.chase, t);
+  return {...pose, roll: .04 * Math.sin(.5 * t) + .03 * c.kick};
+};
+
+const Tunnel = (p: SceneProps) => {
+  const {t, light, world} = p;
   return <>
-    <color attach="background" args={[PALETTE.void]}/>
-    <fogExp2 attach="fog" args={[PALETTE.void, .055]}/>
-    {Array.from({length: RINGS}, (_, i) => {
-      const z = -((((i * SPACING - travel) % LENGTH) + LENGTH) % LENGTH), depth = -z / LENGTH;
-      const hot = (i % 4 === 0 ? 1.2 : .22) * (1 + 1.5 * c.kick);
-      return <mesh key={i} position={[0, 0, z]} rotation={[0, 0, i * .3 + .1 * t]} scale={1 + .05 * Math.sin(i + t)}>
-        <torusGeometry args={[2.4, .045 + .03 * c.bass, 6, 64]}/>
-        <meshBasicMaterial color={scaleRGB(lightRamp(.22 + .5 * light * (1 - .7 * depth)), hot * (.5 + .5 * presence))}/>
-      </mesh>;
-    })}
-    <group position={[0, 0, -8]}>
-      <Embers seed={seed} count={300} t={t} presence={presence} mode="drift" radius={5} light={light} pulse={c.kick} size={.06} speed={1.4}/>
-    </group>
+    <Backdrop light={light} glow={.3} center={camera(p).position}/>
+    <Plain t={t} light={light} world={world} floor={.6} swellGain={1}/>
+    <Walkers t={t} world={world} max={200} light={light}/>
+    <Wick world={world} light={light}/>
+    <GhostLantern world={world} light={light}/>
+    <HeraldBeams world={world}/>
   </>;
 };
 
-export const tunnel: SceneDef = {
-  Component: Tunnel,
-  camera: ({t, controls: c}) => ({position: [.3 * Math.sin(.3 * t), .2 * Math.cos(.23 * t), 2], target: [0, 0, -10], fov: 60, roll: .12 * c.bar + .08 * Math.sin(.2 * t)}),
-};
+export const tunnel: SceneDef = {Component: Tunnel, camera};

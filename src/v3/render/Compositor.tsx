@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import {MotifLayer, MOTIF_CAMERA} from '../elements/MotifLayer';
 import type {CameraPose, FrameState} from '../engine/frame';
 import {SCENES} from '../scenes/registry';
+import {WorldContext} from '../world';
+import type {World} from '../world';
 import type {SceneId} from '../scenes/registry';
 import {BLOOM_THRESHOLD, COMPOSITE, DOWN, UP, raw} from './shaders/post.glsl';
 import {FULLSCREEN, TRANSITION} from './shaders/transition.glsl';
@@ -80,8 +82,9 @@ const slotFor = (slots: Map<SceneId, Slot>, id: SceneId) => {
  * Renders each active scene into its own HDR layer, blends them with the incoming scene's transition,
  * overlays the motif layer, then bloom + ACES + grain to the canvas. The only useFrame in v3: all
  * per-frame state arrives as props and is applied in layout effects before Remotion's manual advance.
+ * Every portal gets the static World through WorldContext (portals do not inherit context from outside the canvas).
  */
-export const Compositor = ({state}: {state: FrameState}) => {
+export const Compositor = ({state, world}: {state: FrameState; world: World}) => {
   const gl = useThree(s => s.gl);
   const pipe = useMemo(() => createPipeline(gl), [gl]);
   useEffect(() => () => pipe.dispose(), [pipe]);
@@ -96,7 +99,10 @@ export const Compositor = ({state}: {state: FrameState}) => {
   useFrame(() => pipe.render(layers.map(l => l.slot), motif), 1);
   // Keyed by scene id, so the incoming scene keeps its instance when it moves from slot 1 to slot 0.
   return <>
-    {layers.map(l => {const {Component} = SCENES[l.scene.id]; return <Fragment key={l.scene.id}>{createPortal(<Component {...l.props}/>, l.slot.scene)}</Fragment>;})}
-    {createPortal(<MotifLayer state={state.motifs} t={state.t} light={state.post.light}/>, motif.scene)}
+    {layers.map(l => {
+      const {Component} = SCENES[l.scene.id];
+      return <Fragment key={l.scene.id}>{createPortal(<WorldContext.Provider value={world}><Component {...l.props}/></WorldContext.Provider>, l.slot.scene)}</Fragment>;
+    })}
+    {createPortal(<WorldContext.Provider value={world}><MotifLayer state={state.motifs} t={state.t} light={state.post.light}/></WorldContext.Provider>, motif.scene)}
   </>;
 };

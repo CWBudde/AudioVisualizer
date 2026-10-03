@@ -1,17 +1,23 @@
 import type {FC} from 'react';
 import type {CameraPose, SceneProps} from '../engine/frame';
-import {bloom} from './Bloom';
-import {emberField} from './EmberField';
+import {drift} from './Drift';
+import {homecoming} from './Homecoming';
+import {interlocking} from './Interlocking';
+import {memoryPlain, sleepingPlain} from './PlainSolo';
+import {firstParade, grandParade} from './Procession';
 import {tunnel} from './Tunnel';
-import {voidScene} from './Void';
 
 /** A scene: what to draw (rendered into its own layer) and where its camera is, both pure functions of SceneProps. */
 export type SceneDef = {Component: FC<SceneProps>; camera: (p: SceneProps) => CameraPose};
 // Add a scene: scenes/<Name>.tsx exporting a SceneDef, one line here, then use its id in ../timeline.ts.
 export const SCENES = {
-  'void': voidScene,
-  'ember-field': emberField,
+  'sleeping-plain': sleepingPlain,
+  'first-parade': firstParade,
+  'interlocking': interlocking,
+  'drift': drift,
   'tunnel': tunnel,
-  'bloom': bloom,
+  'memory-plain': memoryPlain,
+  'grand-parade': grandParade,
+  'homecoming': homecoming,
 } satisfies Record<string, SceneDef>;
 export type SceneId = keyof typeof SCENES;

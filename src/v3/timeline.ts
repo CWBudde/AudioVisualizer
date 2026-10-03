@@ -1,26 +1,39 @@
 import type {Entry} from './engine/timeline';
 import type {TimeRef} from './engine/time';
 
-// THE story data. Each entry takes over at `from` and lasts until the next one; `in` says how it arrives.
-// Retime or reorder scenes here only. Placeholder cut: proves every transition kind across all ten cues.
+// THE story data (docs/v3/script.md §2.8, §3). Each entry takes over at `from` and lasts until the next one; `in` says how it arrives.
+// Retime or reorder scenes here only.
 export const TIMELINE: Entry[] = [
-  {scene: 'void', from: {s: 0}},
-  // The parade burns through the darkness; the front completes on the first-parade downbeat, across the pause.
-  {scene: 'ember-field', from: {cue: 'first-parade'}, in: {kind: 'burn', length: {beats: 3}}},
-  // Light floods in around the second pause.
-  {scene: 'tunnel', from: {cue: 'interlocking-parade'}, in: {kind: 'wash', length: {beats: 2}, anchor: 'center'}},
-  {scene: 'void', from: {cue: 'open-breakdown'}, in: {kind: 'dissolve', length: {bars: 1}}},
-  {scene: 'tunnel', from: {cue: 'tunnel-return'}, in: {kind: 'wash', length: {beats: 2}}},
-  {scene: 'ember-field', from: {cue: 'suspended-breakdown'}, in: {kind: 'dissolve', length: {bars: 1}}},
-  // The 62.3 s contraction opens through the motif glyph into the finale.
-  {scene: 'bloom', from: {cue: 'finale'}, in: {kind: 'iris', length: {s: 1.7}}},
-  {scene: 'void', from: {cue: 'settle'}, in: {kind: 'dissolve', length: {bars: 1}, anchor: 'start'}},
+  {scene: 'sleeping-plain', from: {s: 0}},
+  // Out of the first held breath, the world opens through Wick's crest on the downbeat.
+  {scene: 'first-parade', from: {cue: 'first-parade'}, in: {kind: 'iris', length: {s: .45}, anchor: 'start'}},
+  // One blink across the second breath: a re-angle onto two columns.
+  {scene: 'interlocking', from: {cue: 'interlocking-parade'}, in: {kind: 'dissolve', length: {s: .26}}},
+  // The drop-out taper: the floor burns away from the head of the line as the kick thins.
+  {scene: 'drift', from: {cue: 'open-breakdown'}, in: {kind: 'burn', length: {s: 1.75}}},
+  // Two-stage re-entry: embers gridded on the 44.03 snare in drift, then the bass slide brings the walls.
+  {scene: 'tunnel', from: {bar: 20}, in: {kind: 'dissolve', length: {s: .35}}},
+  // Crossfade while the pad bridges and the noise band falls.
+  {scene: 'memory-plain', from: {cue: 'suspended-breakdown'}, in: {kind: 'dissolve', length: {s: 2.4}, anchor: 'start'}},
+  // The mirror of 9.18 with a bigger release (plus the FLASHES wash at 64.038).
+  {scene: 'grand-parade', from: {bar: 28}, in: {kind: 'iris', length: {s: .35}, anchor: 'start'}},
+  // The early C chord floods amber; the spectral collapse lands at 82.35.
+  {scene: 'homecoming', from: {s: 82.35}, in: {kind: 'wash', length: {s: .31}}},
 ];
 
-/** Global position on the darkness→light arc (0–1), eased between keys. */
+/** Global position on the darkness→light arc (0–1), eased between keys. Sorted. */
 export const LIGHT: [TimeRef, number][] = [
-  [{s: 0}, .05], [{cue: 'first-pause'}, .15], [{cue: 'first-parade'}, .35], [{cue: 'second-pause'}, .3],
-  [{cue: 'interlocking-parade', offsetBars: 2}, .5], [{cue: 'open-breakdown'}, .45], [{cue: 'open-breakdown', offsetBars: 2}, .3],
-  [{cue: 'tunnel-return'}, .55], [{cue: 'suspended-breakdown'}, .5], [{cue: 'finale'}, .85], [{cue: 'finale', offsetBars: 6}, 1],
-  [{cue: 'settle'}, .7], [{s: 86.12}, .25],
+  [{s: 0}, .08], [{s: 8.03}, .08], [{s: 8.6}, .12], [{cue: 'first-pause'}, .06], [{cue: 'first-parade'}, .06], [{s: 9.7}, .35],
+  [{cue: 'second-pause'}, .38], [{cue: 'interlocking-parade'}, .4], [{bar: 9}, .5], [{bar: 13}, .5], [{s: 31.2}, .4],
+  [{s: 34.85}, .4], [{cue: 'open-breakdown'}, .26], [{bar: 18}, .2], [{s: 44.03}, .22], [{bar: 20}, .45], [{bar: 21}, .55],
+  [{bar: 23}, .55], [{s: 54.2}, .6], [{cue: 'suspended-breakdown'}, .45], [{s: 57.3}, .3], [{s: 63.62}, .28], [{bar: 28}, .3],
+  [{s: 64.6}, .75], [{bar: 32}, .85], [{bar: 35}, .95], [{s: 82.04}, .95], [{s: 82.35}, .72], [{s: 85.73}, .7], [{s: 86.12}, .35],
 ];
+/** Crest staccato (0) → legato (1). Same interpolation as LIGHT. */
+export const LEGATO: [TimeRef, number][] = [
+  [{s: 0}, 0], [{cue: 'first-parade'}, 0], [{bar: 5}, .25], [{cue: 'interlocking-parade'}, .4], [{cue: 'open-breakdown'}, .4],
+  [{s: 37.2}, .1], [{bar: 20}, .1], [{s: 46.3}, .45], [{cue: 'suspended-breakdown'}, .45], [{s: 57.3}, .3], [{bar: 28}, .3],
+  [{bar: 29}, 1], [{s: 86.12}, 1],
+];
+/** Global warm flashes added in the composite (post.flash): [time, attack s, decay s, strength, ramp x]. */
+export const FLASHES: [number, number, number, number, number][] = [[9.18, .02, .3, .3, .857], [64.038, .04, .5, .7, .714]];
