@@ -8,6 +8,8 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strconv"
 
 	"github.com/cwbudde/AudioVisualizer/internal/audioanalysis"
@@ -111,13 +113,31 @@ func fastStart(path string) (bool, error) {
 		}
 	}
 }
+// version mirrors scripts/version.ts: PP_VERSION picks which visualizer's master to check.
+func version() (string, error) {
+	v := os.Getenv("PP_VERSION")
+	if v == "" {
+		v = "v2"
+	}
+	if !regexp.MustCompile(`^v[0-9]+$`).MatchString(v) {
+		return "", fmt.Errorf("invalid PP_VERSION %q", v)
+	}
+	return v, nil
+}
 func run() error {
-	const path = "out/PixelParade.mp4"
+	v, err := version()
+	if err != nil {
+		return err
+	}
+	path, reports := filepath.Join("out", v, "PixelParade-"+v+".mp4"), filepath.Join("analysis", v)
+	if err := os.MkdirAll(reports, 0755); err != nil {
+		return err
+	}
 	probe, err := exec.Command("ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", path).Output()
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile("analysis/render-probe.json", probe, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(reports, "render-probe.json"), probe, 0644); err != nil {
 		return err
 	}
 	var p struct {
@@ -216,7 +236,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile("analysis/render-validation.json", data, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(reports, "render-validation.json"), data, 0644); err != nil {
 		return err
 	}
 	fmt.Println(string(data))

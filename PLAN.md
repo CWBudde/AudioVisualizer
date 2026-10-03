@@ -2,6 +2,8 @@
 
 Completed 2026-10-03. **Preparation, Remotion implementation, previews, full MP4 rendering, and final verification are complete.**
 
+This plan documents **v1** (the SVG/Canvas parade, now in `src/v1/`, composition `PixelParade-v1`). v2 (`src/v2/`) replaced it with a WebGL shader renderer; both are kept side by side and selected with `PP_VERSION` (see README). Paths below are the per-version locations.
+
 ## 1. Deliverable and creative direction
 
 Create a full-track **1080×1080, 60 fps MP4** using Remotion motion design. The chosen direction is a **neon geometric parade with no text**: luminous diamonds, squares, rings, and ribbons assemble, travel through depth, disperse during breakdowns, and return in a fuller finale. The source soundtrack stays at its original timing and gain.
@@ -10,9 +12,9 @@ The initial preparation milestone ended with copied audio, local stems, reproduc
 
 ### Completed artifacts
 
-- Full master: [`out/PixelParade.mp4`](out/PixelParade.mp4), 1080×1080 at 60 fps, all 5168 frames, H.264 `yuv420p` / BT.709 and stereo AAC.
-- Four representative clips in `out/previews/`; reviewed scene contact sheet: [`out/storyboard.jpg`](out/storyboard.jpg).
-- Final export/audio/timestamp checks: [`analysis/render-validation.json`](analysis/render-validation.json), stream probe: [`analysis/render-probe.json`](analysis/render-probe.json), and resumable render provenance: [`analysis/render-production.json`](analysis/render-production.json).
+- Full master: [`out/v1/PixelParade-v1.mp4`](out/v1/PixelParade-v1.mp4), 1080×1080 at 60 fps, all 5168 frames, H.264 `yuv420p` / BT.709 and stereo AAC.
+- Four representative clips in `out/v1/previews/`; reviewed scene contact sheet: [`out/storyboard.jpg`](out/storyboard.jpg).
+- Final export/audio/timestamp checks: [`analysis/v1/render-validation.json`](analysis/v1/render-validation.json), stream probe: [`analysis/v1/render-probe.json`](analysis/v1/render-probe.json), and resumable render provenance: [`analysis/v1/render-production.json`](analysis/v1/render-production.json).
 - Original soundtrack: [`public/audio/PixelParade.wav`](public/audio/PixelParade.wav).
 - Four float32 stereo stems: `analysis/stems/htdemucs/PixelParade/{drums,bass,other,vocals}.wav`.
 - Full 100 Hz analysis and cue data: [`analysis/features.json`](analysis/features.json).
@@ -180,13 +182,13 @@ Go runtime: 1.26.1. The four algorithm repositories are clean. `wav` has existin
 
 ## 5. Implemented Remotion build and render
 
-The source is in `src/`: pure controls and choreography, SVG background/formations/ribbons/impact rings/core, Canvas sparks, and the registered `PixelParadeSquare` composition. `cmd/controls` exports the compact 3.0 MB public timeline without changing measured values. Bun dependencies are pinned and locked in `bun.lock`; orchestration scripts are compiled by Bun and executed with Node.
+The source is in `src/v1/` (shared controls in `src/shared/`): pure controls and choreography, SVG background/formations/ribbons/impact rings/core, Canvas sparks, and the registered `PixelParade-v1` composition. `cmd/controls` exports the compact 3.0 MB public timeline without changing measured values. Bun dependencies are pinned and locked in `bun.lock`; orchestration scripts are compiled by Bun and executed with Node.
 
 The Linux browser preflight passed with Remotion's Chrome Headless Shell 149.0.7790.0 downloaded from its official distribution. The previous native Chrome sandbox failure is resolved for this renderer. Rendering uses two workers, H.264 CRF 18 with the `fast` x264 preset, explicit BT.709 limited range, stereo AAC at 320 kbps, and a lossless fast-start remux. The `fast` preset reduces software encoding cost on the busy host. Initial previews use full-range YUV; the master explicitly corrects that to `yuv420p` with BT.709.
 
-Twenty scene frames were captured at full resolution and reviewed in `out/storyboard.jpg`. Three actual captured PNGs matched SHA-256 hashes when re-rendered in a different order; see `analysis/frame-determinism.json`. All 233 drum events respond by the first frame after their timestamps (maximum delay 16.67 ms); both measured pauses suppress impacts and sparks. Geometry bounds, particle limits, schema/source identity, exact exported controls, and pure seek behavior pass `scripts/validate.ts` and are recorded in `analysis/visual-validation.json`.
+Twenty scene frames were captured at full resolution and reviewed in `out/storyboard.jpg`. Three actual captured PNGs matched SHA-256 hashes when re-rendered in a different order; see `analysis/v1/frame-determinism.json`. All 233 drum events respond by the first frame after their timestamps (maximum delay 16.67 ms); both measured pauses suppress impacts and sparks. Geometry bounds, particle limits, schema/source identity, exact exported controls, and pure seek behavior pass `scripts/validate.ts` and are recorded in `analysis/v1/visual-validation.json`.
 
-The four full-resolution previews are in `out/previews/`: `01-opening.mp4`, `02-breakdown-return.mp4`, `03-finale-entrance.mp4`, and `04-ending.mp4`. Their dimensions, frame counts, frame rates, and audio formats pass `scripts/inspect-previews.ts`; the probe records are in `analysis/preview-validation.json`. Encoded opening, breakdown, finale, and ending frames were visually inspected. One interrupted preview job was resumed; all four clips completed successfully.
+The four full-resolution previews are in `out/v1/previews/`: `01-opening.mp4`, `02-breakdown-return.mp4`, `03-finale-entrance.mp4`, and `04-ending.mp4`. Their dimensions, frame counts, frame rates, and audio formats pass `scripts/inspect-previews.ts`; the probe records are in `analysis/v1/preview-validation.json`. Encoded opening, breakdown, finale, and ending frames were visually inspected. One interrupted preview job was resumed; all four clips completed successfully.
 
 Long render jobs were externally terminated in this environment, including a single master job at about 59%. Production now uses `scripts/render-master.ts`: nine 600-frame sections (the last has 368 frames), each saved and format-checked separately. A fingerprint covers source code, soundtrack, controls, locked dependencies, and render settings; a resumed job reuses only matching completed sections. Assembly copies video streams without another encode and encodes the complete original WAV to AAC once. Final verification checks all 5168 frames and waveform alignment across the joined file.
 
@@ -201,14 +203,14 @@ rtk proxy bun run render
 rtk proxy sh scripts/go.sh run ./cmd/verifyrender
 ```
 
-`cmd/verifyrender` checks the master stream format, 5168 frames, fast-start MP4 boxes, complete decode, audio duration, and beginning/middle/end/tail waveform correlation, gain, and lag against the original WAV. It writes `analysis/render-probe.json` and `analysis/render-validation.json`.
+`cmd/verifyrender` checks the master stream format, 5168 frames, fast-start MP4 boxes, complete decode, audio duration, and beginning/middle/end/tail waveform correlation, gain, and lag against the original WAV. It writes `analysis/v1/render-probe.json` and `analysis/v1/render-validation.json`.
 
 The completed master passed every export check. All 5168 decoded frame timestamps agree with `frame / 60` within 0.000334 ms, including section joins. Beginning, middle, end, and tail audio comparisons each detect **0.000 ms lag**, with correlations **0.999842–0.999982**. Whole-file RMS differs by **−0.014851 dB** after AAC encoding. Decoded AAC lasts 86.122667 seconds, including 2.667 ms of codec padding; the original's complete 86.120-second tail is present. Waveform comparisons use the Go loader's aligned 24 kHz channel data; whole-file RMS is measured before resampling. Verification uses a temporary PCM16 decode to avoid the sibling WAV decoder's unsupported extensible-float header; this does not change the deliverable. A known-delay/gain test validates the verification clock independently of retained 48 kHz source metadata. Full decode, final BT.709 frame inspection, and the intentional black final frame all pass.
 
 ### Runtime and architecture
 
 - Pin `remotion`, `@remotion/cli`, `@remotion/renderer`, and `@remotion/media` to **4.0.532**, the version queried from the npm registry during preparation. Use React/React DOM 19.2.0 and TypeScript 5.9.3 with Bun and a committed lockfile.
-- Register one composition, `PixelParadeSquare`, with width/height 1080, fps 60, and `durationInFrames = ceil(86.12 × 60) = 5168`.
+- Register one composition, `PixelParade-v1`, with width/height 1080, fps 60, and `durationInFrames = ceil(86.12 × 60) = 5168`.
 - Use SVG/CSS for major geometry and a bounded Canvas layer for sparks. Simulate depth through deterministic perspective projection; no WebGL dependency is required.
 - Split scene responsibilities into a background, formation renderer, ribbons, impact rings, and sparks. Reuse persistent token identities across cue morphs.
 - Evaluate every pose directly from frame number and event history. Do not accumulate animation state, depend on wall-clock time, or use unseeded randomness.
@@ -230,12 +232,12 @@ Review formation legibility, continuity, actual transient synchronization, and t
 
 ### Master export
 
-Output: `out/PixelParade.mp4`. Use H.264, `yuv420p`, BT.709 limited range, CRF 18 with the `fast` x264 preset, AAC stereo at 320 kbps, two render workers, and MP4 fast start. Export all 5168 frames; the video ends about 13 ms after the WAV. Do not trim, retime, normalize, or fade the audio. The visual tail follows the source's natural ending.
+Output: `out/v1/PixelParade-v1.mp4`. Use H.264, `yuv420p`, BT.709 limited range, CRF 18 with the `fast` x264 preset, AAC stereo at 320 kbps, two render workers, and MP4 fast start. Export all 5168 frames; the video ends about 13 ms after the WAV. Do not trim, retime, normalize, or fade the audio. The visual tail follows the source's natural ending.
 
 Once scripts exist, the equivalent render command is:
 
 ```sh
-rtk proxy bunx remotion render src/index.ts PixelParadeSquare out/PixelParade.mp4 --codec=h264 --pixel-format=yuv420p --color-space=bt709 --x264-preset=fast --crf=18 --audio-codec=aac --audio-bitrate=320k --concurrency=2
+rtk proxy bunx remotion render src/index.ts PixelParade-v1 out/v1/PixelParade-v1.mp4 --codec=h264 --pixel-format=yuv420p --color-space=bt709 --x264-preset=fast --crf=18 --audio-codec=aac --audio-bitrate=320k --concurrency=2
 ```
 
 Ensure fast start through the supported renderer configuration or a final lossless `ffmpeg -c copy -movflags +faststart` remux.

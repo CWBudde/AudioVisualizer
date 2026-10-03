@@ -1,7 +1,7 @@
-import {FIFTHS, MAX_NOTES, getAudioControls} from '../controls';
+import {FIFTHS, MAX_NOTES, getAudioControls} from '../../shared/controls';
 import {shotAt} from '../director';
 import type {Shot} from '../director';
-import type {Analysis, AudioControls} from '../types';
+import type {Analysis, AudioControls} from '../../shared/types';
 
 /** Mean chroma hue of the track; harmony shifts the palette relative to this home. */
 const HOME_HUE = .235;

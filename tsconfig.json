@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": ["bun"]
   },
-  "include": ["src", "scripts/*.ts"]
+  "include": ["src", "scripts/**/*.ts"]
 }

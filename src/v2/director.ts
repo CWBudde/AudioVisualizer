@@ -1,5 +1,5 @@
-import {clamp, ease, lerp} from './controls';
-import type {Analysis, AudioControls} from './types';
+import {clamp, ease, lerp} from '../shared/controls';
+import type {Analysis, AudioControls} from '../shared/types';
 
 /**
  * A shot is everything the renderer needs besides raw audio: world mix, camera

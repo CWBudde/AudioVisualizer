@@ -8,6 +8,7 @@
     "analyze": "sh scripts/go.sh run ./cmd/analyze && sh scripts/go.sh run ./cmd/controls",
     "typecheck": "tsc --noEmit",
     "validate": "bun scripts/validate.ts",
+    "validate:all": "PP_VERSION=v1 bun scripts/validate.ts && PP_VERSION=v2 bun scripts/validate.ts",
     "preflight": "bun build scripts/preflight.ts --target=node --packages=external --outfile=.cache/preflight.mjs && node .cache/preflight.mjs",
     "render:stills": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs stills",
     "render:preview": "bun run typecheck && bun run validate && bun build scripts/render.ts --target=node --packages=external --outfile=.cache/render.mjs && node .cache/render.mjs preview && bun scripts/inspect-previews.ts",

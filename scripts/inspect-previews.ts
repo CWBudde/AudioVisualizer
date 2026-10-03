@@ -1,9 +1,12 @@
 import {execFileSync} from 'node:child_process';
 import {writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import {pathsFor, versionFromEnv} from './version';
+
+const paths = pathsFor(versionFromEnv());
 const clips = [['01-opening', 720], ['02-breakdown-return', 780], ['03-finale-entrance', 480], ['04-ending', 368]] as const;
 const reports = clips.map(([name, frames]) => {
-  const data = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', `out/previews/${name}.mp4`], {encoding: 'utf8'}));
+  const data = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', `${paths.previews}/${name}.mp4`], {encoding: 'utf8'}));
   const v = data.streams.find((s: {codec_type: string}) => s.codec_type === 'video');
   const a = data.streams.find((s: {codec_type: string}) => s.codec_type === 'audio');
   assert.equal(v.nb_frames, String(frames)); assert.equal(v.width, 1080); assert.equal(v.height, 1080);
@@ -11,5 +14,5 @@ const reports = clips.map(([name, frames]) => {
   assert.equal(a.codec_name, 'aac'); assert.equal(a.channels, 2); assert.equal(a.sample_rate, '48000');
   return {name, ...data};
 });
-await writeFile('analysis/preview-validation.json', JSON.stringify(reports, null, 2));
+await writeFile(`${paths.analysis}/preview-validation.json`, JSON.stringify(reports, null, 2));
 console.log('All four encoded previews passed format/frame/audio checks.');
