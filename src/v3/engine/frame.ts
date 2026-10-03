@@ -5,7 +5,7 @@ import {occurrenceProgress, recentOccurrences, storyAt} from '../story';
 import type {Story, StoryAt} from '../story';
 import {FLASHES, LEGATO, LIGHT, TIMELINE} from '../timeline';
 import {ANCHOR, CREST_HALF} from '../render/shaders/crest.glsl';
-import {buildWorld, worldAt} from '../world';
+import {buildWorld, WICK_H, worldAt} from '../world';
 import type {World, WorldFrame} from '../world';
 import {clamp, ease, lerp, smoothstep} from './easing';
 import {resolveRef} from './time';
@@ -118,7 +118,7 @@ function motifState(a: Analysis, w: World, story: Story, t: number, light: numbe
   const tau = world.held, legato = keyedAt(a, LEGATO, t), columns = crestColumns(w, tau, legato);
   const shrink = crestShrink(t), offset = 1 - smoothstep(84.615, 84.9, t);
   const scale = lerp(lerp(.05, .08, smoothstep(64.038, 66.324, t)), .004, shrink);
-  const {p, y, scale: ws} = world.wick, head: Vec3 = [p[0], y + lerp(.4, 1, offset) * ws, p[2]];
+  const {p, y, scale: ws} = world.wick, head: Vec3 = [p[0], y + lerp(WICK_H / 2, WICK_H + .15, offset) * ws, p[2]];
   const h0 = projectNdc(layers[0].camera, head), h1 = layers[1] ? projectNdc(layers[1].camera, head) : h0;
   const base: Vec2 = [lerp(h0[0], h1[0], mix), lerp(h0[1], h1[1], mix) + .012 * offset];
   const q0: Vec2 = [(1 - offset) * CREST_HALF, (1 - offset) * 3 / 84];

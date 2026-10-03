@@ -3,7 +3,7 @@ export type {Frame3, Occ, Rig, WalkerLook, WalkerTable, World, WorldFrame} from 
 export {DEG, L, U, W, causewayY, routeFrame, routePoint} from './route';
 export {FREEZES, heldTime, wickArc} from './clock';
 export {buildWorld} from './build';
-export {worldAt} from './frame';
+export {WICK_H, WICK_W, worldAt} from './frame';
 export {posesAt} from './poses';
 export {RIGS, TOP_POSE, blendPose, followRig} from './rigs';
 export {WorldContext, useWorld} from './context';

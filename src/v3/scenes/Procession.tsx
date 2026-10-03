@@ -25,6 +25,8 @@ type Props = SceneProps & {grand?: boolean};
  */
 const PARADE_HIGH: Rig = {back: -20, side: -24, up: 14, ahead: -8, lift: 0, fov: 45};
 const WIDER = 2.2;
+/** The rise starts from the plains' low dolly: walkers next to its lens fade out as they do there (WP2-R6). */
+const NEAR: [number, number] = [2.5, 9];
 const GRAND_HIGH: Rig = {back: PARADE_HIGH.back * WIDER, side: PARADE_HIGH.side * WIDER, up: PARADE_HIGH.up * WIDER, ahead: PARADE_HIGH.ahead * WIDER, lift: 0, fov: 50};
 /** Low beside the head of the line: the M4 ring closes around it and the stair rises in profile (§4.7 70.9–72.0). */
 const STAIR: Rig = {back: 0, side: -18, up: 7, ahead: 2, lift: 1.5, fov: 45};
@@ -81,7 +83,7 @@ const Procession = (p: Props) => {
     <fogExp2 attach="fog" args={[0, fog]} color={fogColor} density={fog}/>
     <Backdrop light={light} glow={sky} center={camera.position} tint={world.horizon.tint} shadow={0}/>
     <Plain t={t} light={light} world={world} fog={fogged} swellGain={swellGain}/>
-    <Walkers t={t} world={world} max={grand ? 2048 : 200} light={light} fog={fogged} swellGain={swellGain}/>
+    <Walkers t={t} world={world} max={grand ? 2048 : 200} light={light} fog={fogged} swellGain={swellGain} near={NEAR}/>
     <LoopRing world={world}/>
     {grand && <><Answer world={world} light={light}/><HeraldBeams world={world}/></>}
     <GhostLantern world={world} light={light}/>

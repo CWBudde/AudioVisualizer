@@ -40,7 +40,7 @@ export type WorldFrame = {
   pedal: number;
   swell: {center: Vec3; amp: number};
   kicks: number[]; snares: number[]; hats: number[]; // last 6 / 2 / 4 onset times ≤ held (−1e3 when none)
-  ghost: {p: Vec3; glow: number; radius: number};
+  ghost: {p: Vec3; glow: number; radius: number; lantern: number}; // lantern 0–1: the finale body (descent on)
   answer: {p: Vec3; glow: number; visible: number; stand: number};
   shadow: {strength: number; frontArc: number; sky: number; pulse: number};
   horizon: {glow: number; tint: number};

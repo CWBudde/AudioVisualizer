@@ -25,9 +25,10 @@ await mkdir(paths.analysis, {recursive: true});
 const stillPath = (frame: number) => `${paths.stills}/${String(frame).padStart(4, '0')}.png`;
 let progress = -1;
 // v3: the docs/v3/script.md §7.2 stills, plus 180 and 2400 for the repeat-hash check and 2340 / 2580 where the drift climb and
-// the B7 rise have actually happened (2330 and 2500 land just before them); transition midpoints are added below.
+// the B7 rise have actually happened (2330 and 2500 land just before them), and 2990 where chevron #5 is fully lit (its
+// first arm lights at f2891, so 2890 shows only the crimson pulse); transition midpoints are added below.
 const V3_STILLS = [30, 180, 300, 500, 540, 563, 700, 900, 1022, 1090, 1120, 1150, 1237, 1800, 2075, 2143, 2250, 2330, 2340, 2400, 2500, 2580, 2660,
-  2734, 2790, 2890, 3050, 3180, 3240, 3366, 3450, 3620, 3780, 3830, 3853, 3900, 4000, 4314, 4350, 4420, 4800, 4900, 4930, 4960, 5040, 5080, 5120, 5160];
+  2734, 2790, 2890, 2990, 3050, 3180, 3240, 3366, 3450, 3620, 3780, 3830, 3853, 3900, 4000, 4314, 4350, 4420, 4800, 4900, 4930, 4960, 5040, 5080, 5120, 5160];
 console.log(`Bundling PixelParade ${version}…`);
 const serveUrl = await bundle({entryPoint: 'src/index.ts', outDir: resolve(workspace ? `.cache/remotion-bundle-${workspace}` : '.cache/remotion-bundle'), onProgress: p => {const bucket = Math.floor(p / 25); if (bucket > progress) {console.log(`Bundle ${p}%`); progress = bucket;}}});
 await ensureBrowser();

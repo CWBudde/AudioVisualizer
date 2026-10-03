@@ -32,6 +32,7 @@ void main() {
   vec2 ndc = vUv * 2. - 1., q = (ndc - uCenter) / uScale + ANCHOR;
   float px = max(fwidth(q.x), 1e-5), crest = 1. - uDot;
   vec3 col = vec3(0.);
+  float back = 0.;
   if (crest > 0.) {
     float kc = floor((q.x + CREST_HALF) / CREST_COL), base = .55 * uLegato, hw = .5 * uWidth * CREST_COL, cap = max(1.5 * px, .035);
     for (int j = -1; j <= 1; j++) {
@@ -43,6 +44,8 @@ void main() {
       float d = boxSdf(q - vec2(-CREST_HALF + (kf + .5) * CREST_COL, h * .5), vec2(hw, h * .5));
       float fill = smoothstep(.75 * px, -.75 * px, d), top = 1. + .4 * smoothstep(h - cap - px, h - cap, q.y);
       vec3 c = lightRamp(mix(1., .74, uLegato) + .12 * flare) * vis;
+      // An ink backing a little wider than each visible column, so the crown reads over a bright crowd too.
+      back = max(back, clamp(vis * 2., 0., 1.) * smoothstep(2.5 * px, .5 * px, d));
       col += c * (fill * top + .22 * exp(-max(d, 0.) / .05)) * uGlow;
     }
     for (int i = 0; i < ${RINGS}; i++) {
@@ -56,13 +59,15 @@ void main() {
   // The freeze dot: one flare pixel at the crest base.
   vec2 dp = (ndc - (uCenter - ANCHOR * uScale)) / max(fwidth(ndc.x), 1e-6);
   col += P_FLARE * 2.5 * uDot * exp(-dot(dp, dp) / .5);
-  o = vec4(col, 1.);
+  // Premultiplied over: the light adds, the backing darkens what lies under the columns (invisible on a dark plain).
+  o = vec4(col, .6 * back * crest);
 }`;
 
 /** The persistent crest, drawn after the scene blend so it carries continuity across transitions. t is motion time (held through freezes). */
 export const MotifLayer = ({state, t, light}: {state: MotifState; t: number; light: number}) => {
   const material = useMemo(() => new THREE.RawShaderMaterial({
-    glslVersion: THREE.GLSL3, vertexShader: FULLSCREEN, fragmentShader, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+    glslVersion: THREE.GLSL3, vertexShader: FULLSCREEN, fragmentShader, transparent: true, depthTest: false, depthWrite: false,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
     uniforms: {uCenter: {value: new THREE.Vector2()}, uScale: {value: 1}, uGlow: {value: 0}, uLegato: {value: 0}, uWidth: {value: .5}, uDot: {value: 0},
       uCols: {value: Array<number>(12).fill(0)}, uRings: {value: Array.from({length: RINGS}, () => new THREE.Vector2(-1, 0))}},
   }), []);

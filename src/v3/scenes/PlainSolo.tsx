@@ -19,6 +19,10 @@ type Props = SceneProps & {memory?: boolean};
 const FILL = [[8.03, 8.6], [62.89, 63.46]] as const;
 // The held breaths inside these scenes: the plain dims as Wick shrinks to one pixel (§2.1 freeze 1 and 3).
 const BREATH = [[8.746, 8.813, .4], [63.615, 63.682, .55]] as const;
+// Walkers nearer than NEAR[1] tiles to the lens shrink to their size at NEAR[1] (gone by NEAR[0]): the dolly sits 2.5 tiles
+// outside the F3 band, and resting walkers beside it would fill the lower frame as huge blocks (WP2-R6). Kept as small dim
+// heads, they still fill the f3830 freeze; the plain stays the callback of f300.
+const NEAR: [number, number] = [2.5, 11];
 const FOG = .026; // exp² density: the plain sinks into ink about 40 tiles out; the 25–45-tile blinks stay readable
 
 /**
@@ -41,7 +45,7 @@ const PlainSolo = (p: Props) => {
     <fogExp2 attach="fog" args={[0, FOG]} color={fog.color} density={FOG}/>
     <Backdrop light={light} glow={sky} center={camera(p).position} tint={world.horizon.tint} shadow={world.shadow.sky}/>
     <Plain t={t} light={light} world={world} residue={memory ? 1.4 : 1} fog={fog} swellGain={0} dim={dim}/>
-    <Walkers t={t} world={world} max={memory ? 2048 : 200} light={light} fog={fog}/>
+    <Walkers t={t} world={world} max={memory ? 2048 : 200} light={light} fog={fog} near={NEAR}/>
     <Wick world={world} light={light}/>
     <GhostLantern world={world} light={light}/>
     {memory && <><Answer world={world} light={light}/><HeraldBeams world={world}/></>}

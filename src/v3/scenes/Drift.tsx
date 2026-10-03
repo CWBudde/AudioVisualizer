@@ -30,7 +30,7 @@ const camera = ({t, world}: SceneProps): CameraPose => {
 
 // Stepping stones: each note still lights the tile under Wick's step, but there is no plain to keep it,
 // so the tile flashes under the foot and falls away into the void, cooling yellow → crimson.
-const STONES = 6;
+const STONES = 6, LAND = .06;
 const stoneVS = `
 attribute vec4 aStone;  // x, y, z, size
 attribute vec2 aLook;   // gain, ramp x
@@ -71,11 +71,13 @@ const Stones = ({world}: {world: WorldFrame}) => {
     const stone = geometry.getAttribute('aStone') as THREE.InstancedBufferAttribute, look = geometry.getAttribute('aLook') as THREE.InstancedBufferAttribute;
     const tau = world.held, k = lastAtOrBefore(w.noteStart, tau);
     for (let j = 0; j < STONES; j++) {
-      const i = k - j, age = i >= 0 ? tau - w.noteStart[i] : 9;
+      // Lit as the foot lands (Wick eases onto the tile over .09 s), not while it is still a step ahead.
+      const i = k - j, age = i >= 0 ? tau - w.noteStart[i] - LAND : 9;
       const p = routePoint(i >= 0 ? w.noteArc[i] : 0), vel = i >= 0 ? (w.noteVel[i] / 127) ** .7 : 0;
-      const gain = age < 1.6 ? vel * (1.8 * Math.exp(-age / .1) + .45 * Math.exp(-age / .5)) * (1 - smoothstep(1, 1.6, age)) : 0;
-      stone.setXYZW(j, p[0], (i >= 0 ? climbAt(w, i) : 0) - 1.4 * age * age, p[2], .92 * (1 - .25 * Math.min(age, 1)));
-      look.setXY(j, gain, .86 - .44 * Math.min(age / .9, 1));
+      const gain = age >= 0 && age < 1.6 ? vel * (1.8 * Math.exp(-age / .1) + .45 * Math.exp(-age / .5)) * (1 - smoothstep(1, 1.6, age)) : 0;
+      const fall = Math.max(age, 0);
+      stone.setXYZW(j, p[0], (i >= 0 ? climbAt(w, i) : 0) - 1.4 * fall * fall, p[2], .92 * (1 - .25 * Math.min(fall, 1)));
+      look.setXY(j, gain, .86 - .44 * Math.min(fall / .9, 1));
     }
     stone.needsUpdate = true; look.needsUpdate = true;
   }, [geometry, w, world]);

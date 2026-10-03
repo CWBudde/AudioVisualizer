@@ -47,16 +47,17 @@ const camera = ({t, world}: SceneProps): CameraPose => crane(t, followRig(world,
 
 const Homecoming = (p: SceneProps) => {
   const {t, light, world} = p;
-  const k = move(CRANE[0], CRANE[1], t), fade = 1 - ss(RELEASE[0], RELEASE[1], t), swell = 1 - ss(82.35, 83, t);
+  const k = move(CRANE[0], CRANE[1], t), fade = 1 - ss(RELEASE[0], RELEASE[1], t), swell = 1 - ss(82.35, 83, t), reveal = ss(83.2, 84.5, t);
   // Fog that fits the low causeway view thins to almost nothing at the top, so the whole crest reads crisp.
   const density = lerp(.014, .0012, k), fog = {density, color: mixRGB(tone('ink'), scaleRGB(tone('amber'), .08), .5 * world.horizon.glow)};
   return <>
     <fogExp2 attach="fog" args={[0, density]} color={fog.color} density={density}/>
     <Backdrop light={light} glow={(.1 + .45 * world.horizon.glow) * fade} center={camera(p).position} tint={world.horizon.tint} shadow={world.shadow.sky}/>
     {/* The cooled route history lifts a little as the crane rises (more would also lift the wide wake bands and blur the outline). */}
-    <Plain t={t} light={light} world={world} residue={1 + .4 * k} fog={fog} swellGain={swell} dim={fade}/>
-    {/* Everything but Wick fades to ink on the release: one ember survives. */}
-    <Walkers t={t} world={world} max={2048} light={light} fog={fog} swellGain={swell} dim={fade}/>
+    {/* As the crane tops out the route cells glow, so the outline reads as the crest before the lock relights it (f5080). */}
+    <Plain t={t} light={light} world={world} residue={1 + .4 * k} fog={fog} swellGain={swell} dim={fade} outline={reveal}/>
+    {/* Everything but Wick fades to ink on the release: one ember survives. The resting band dims under the reveal. */}
+    <Walkers t={t} world={world} max={2048} light={light} fog={fog} swellGain={swell} dim={fade * (1 - .6 * reveal)}/>
     <GhostLantern world={world} light={light} dim={fade}/>
     <Answer world={world} light={light} dim={fade}/>
     <HeraldBeams world={world} dim={fade}/>

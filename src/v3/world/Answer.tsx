@@ -17,8 +17,9 @@ export const Answer = ({world: {answer}, light, dim = 1}: AnswerProps) => {
       <boxGeometry/><meshBasicMaterial color={scaleRGB(tone('crimson'), .3 * dim)}/>
     </mesh>
     <mesh position={[x, y + .54 * s, z]} scale={.36 * s}>
-      <boxGeometry/><meshBasicMaterial color={scaleRGB(tone('amber'), 4 * g)}/>
+      <boxGeometry/><meshBasicMaterial color={scaleRGB(tone('amber'), 2.2 * g)}/>
     </mesh>
-    <Glow position={[x, y + .6 * s, z]} radius={.9} color={scaleRGB(tone('amber'), (.5 + .5 * light) * g)} core={.5}/>
+    {/* Smaller and cooler than Wick's light: the answer is a second, lesser flame beside it. */}
+    <Glow position={[x, y + .6 * s, z]} radius={.6} color={scaleRGB(tone('amber'), (.3 + .3 * light) * g)} core={.5}/>
   </>;
 };

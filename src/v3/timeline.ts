@@ -33,7 +33,10 @@ export const LIGHT: [TimeRef, number][] = [
 export const LEGATO: [TimeRef, number][] = [
   [{s: 0}, 0], [{cue: 'first-parade'}, 0], [{bar: 5}, .25], [{cue: 'interlocking-parade'}, .4], [{cue: 'open-breakdown'}, .4],
   [{s: 37.2}, .1], [{bar: 20}, .1], [{s: 46.3}, .45], [{cue: 'suspended-breakdown'}, .45], [{s: 57.3}, .3], [{bar: 28}, .3],
-  [{bar: 29}, 1], [{s: 86.12}, 1],
+  // The crown is full by 64.6 (with the light), not only at bar 29 (§2.8): §4.7 has the crest regrow as a full crown out of
+  // the 64.04 iris, and f3900 must show it amber.
+  [{s: 64.6}, 1], [{s: 86.12}, 1],
 ];
 /** Global warm flashes added in the composite (post.flash): [time, attack s, decay s, strength, ramp x]. */
-export const FLASHES: [number, number, number, number, number][] = [[9.18, .02, .3, .3, .857], [64.038, .04, .5, .7, .714]];
+// 64.038 at .4 (§2.8 says .7): with 1,848 wake tiles and 2,048 head flashes on top, .7 blew the crest iris out (YAVG ≈ 150 at f3853).
+export const FLASHES: [number, number, number, number, number][] = [[9.18, .02, .3, .3, .857], [64.038, .04, .5, .4, .714]];

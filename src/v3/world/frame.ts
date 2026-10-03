@@ -16,6 +16,9 @@ function lastN(times: Float64Array, t: number, n: number) {
 const add = (a: Vec3, b: Vec3, k = 1): Vec3 => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
 const mix3 = (a: Vec3, b: Vec3, x: number): Vec3 => [lerp(a[0], b[0], x), lerp(a[1], b[1], x), lerp(a[2], b[2], x)];
 
+/** Wick's body in tiles: a 1 × 2 pixel flame, smaller than a walker's .36 voxels and carried by its brightness instead. */
+export const WICK_W = .2, WICK_H = .4;
+
 const GHOST_STABS = [19.41, 24.03, 28.65];
 /** Horizon band windows (§2.6): bars 18–19, 24–25, 36–37. */
 const BANDS: [number, number][] = [[41.18, 45.75], [54.9, 59.47], [82.32, 86.12]];
@@ -64,18 +67,24 @@ export function worldAt(w: World, a: Analysis, t: number): WorldFrame {
 
   // Ghost lantern (§2.6): far ahead on the horizon; dives into the tunnel mouth, descends at the stair, then joins Wick.
   const mouth = t < 53 || t >= 57.3 ? 0 : t < 54 ? eioc(t - 53) : 1 - eioc((t - 54) / 3.3);
+  // Descent: D 16 and 2 left of the line (§2.6 says D 28, 4 left: off frame left of the finale's causeway camera), so it
+  // comes down into view ahead of the head and hangs low near the line until it joins.
   const descent = eioc((t - 72.8) / .5);
-  const D = lerp(lerp(70, 18, mouth), 28, descent), H = lerp(lerp(5, 2, mouth), 3, descent);
-  let ghostP = add(add(add(cam.p, cam.h, D), [0, H + yCam, 0]), cam.r, -4);
+  const D = lerp(lerp(70, 18, mouth), 16, descent), H = lerp(lerp(5, 2, mouth), 3, descent);
+  let ghostP = add(add(add(cam.p, cam.h, D), [0, H + yCam, 0]), cam.r, -lerp(4, 2, descent));
+  const join = eioc((t - 79.8) / 1.9);
   if (t >= 79.8) {
     const side = add(add(wick.p, wick.r, -2.5), [0, causewayY(w, arc, t) + lerp(1.2, .8, ss(84, 84.615, t)), 0]);
-    ghostP = mix3(ghostP, side, eioc((t - 79.8) / 1.9));
+    ghostP = mix3(ghostP, side, join);
   }
   let turn = 0;
   for (const c of w.corners) turn = Math.max(turn, ss(c.time - 1.2, c.time - .1, t) * (1 - ss(c.time, c.time + .4, t)));
   let stab = 0;
   for (const s of GHOST_STABS) if (t >= s) stab += Math.exp(-(t - s) / .15);
-  const ghost = {p: ghostP, glow: .35 + 2.2 * vocal + 1.6 * stab + turn, radius: 1.2 + 1.8 * mouth};
+  // From the stair descent on the orb is a lantern: a larger halo around a small body, so it reads at the finale's
+  // causeway distance as a light coming down to the head and walking beside it (three lights lead).
+  const lantern = ss(72.8, 73.3, t);
+  const ghost = {p: ghostP, glow: .35 + .6 * lantern + 2.2 * vocal + 1.6 * stab + turn, radius: 1.2 + 1.8 * mouth + .9 * lantern - 1.1 * join, lantern}; // tighter beside Wick: a third light, not a haze
 
   // The answer (§2.6): lights at 60.24, walks to Wick's side, then follows it (held through breath 3).
   const A0 = w.answerHome, M = w.answerMeet;

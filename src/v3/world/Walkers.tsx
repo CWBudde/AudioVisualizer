@@ -10,16 +10,26 @@ import type {WalkerLook, WorldFrame} from './types';
 
 /**
  * look 'ember' draws heads only as glyph sprites (drift); max caps drawn instances (200 before 54.9, 2048 after).
- * Optional: dim multiplies everything emitted; fog as on the plain (default the plain's); swellGain 1 rides the bass swell like the tiles.
+ * Optional: dim multiplies everything emitted; fog as on the plain (default the plain's); swellGain 1 rides the bass swell like the tiles;
+ * near [a, b]: walkers closer than b tiles to the layer's camera shrink (and dim) so they look no bigger than at b, and are
+ * gone by a, so a low rig never looks through a wall of blocks at the lens (WP2-R6). The default only keeps them off the near plane.
  */
-export type WalkersProps = {t: number; world: WorldFrame; look?: WalkerLook; max?: number; light: number; dim?: number; fog?: Fog; swellGain?: number};
+export type WalkersProps = {t: number; world: WorldFrame; look?: WalkerLook; max?: number; light: number; dim?: number; fog?: Fog; swellGain?: number; near?: [number, number]};
+const NEAR: [number, number] = [1.5, 3.5];
 
 // Pose attributes straight from posesAt: aP0 = x, y, z, yaw; aP1 = lie, stand, head, spark.
 const POSE_GLSL = `
 attribute vec4 aP0, aP1;
 uniform vec3 uSwell;
+uniform vec2 uNear;
 uniform float uLight, uDim;
-vec3 swelled(vec3 p) {vec2 d = p.xz - uSwell.xy; p.y += uSwell.z * exp(-dot(d, d) / 200.); return p;}`;
+vec3 swelled(vec3 p) {vec2 d = p.xz - uSwell.xy; p.y += uSwell.z * exp(-dot(d, d) / 200.); return p;}
+// Closer than uNear.y to the lens a walker shrinks with the distance, so it never looks bigger on screen than one at
+// uNear.y (a dim mark, not a block); by uNear.x it is gone. Per layer: cameraPosition is this layer's camera.
+float nearFade(vec3 p) {
+  float d = distance(p + vec3(0., .36, 0.), cameraPosition);
+  return smoothstep(uNear.x, uNear.x + 1.5, d) * clamp(d / uNear.y, 0., 1.);
+}`;
 
 const bodyVertex = `
 attribute float aPart, aSeed;
@@ -32,15 +42,20 @@ void main() {
   vec3 h = vec3(sin(aP0.w), 0., cos(aP0.w)), r = vec3(-h.z, 0., h.x);
   // Lie: rotate about r so the head falls forward (toward h), lifted so the bar rests on the ground.
   float th = lie * 1.5707963, c = cos(th), s = sin(th);
-  vec3 q = position * stand;
-  q = vec3(q.x, q.y * c - q.z * s + .18 * s * stand, q.y * s + q.z * c);
-  vec3 wp = swelled(aP0.xyz) + r * q.x + vec3(0., q.y, 0.) + h * q.z;
+  vec3 base = swelled(aP0.xyz);
+  float nf = nearFade(base), k = stand * nf;
+  vec3 q = position * k;
+  // A lying walker is a low mark on the plain (half a voxel thick), not a block in a low camera's sight line.
+  float rest = clamp(lie, 0., 1.);
+  q = vec3(q.x, (q.y * c - q.z * s + .18 * s * k) * (1. - .5 * rest), q.y * s + q.z * c);
+  vec3 wp = base + r * q.x + vec3(0., q.y, 0.) + h * q.z;
   // Faces lit by their local normal (top full, sides darker) so close walkers read as blocks, not flat cards.
   float face = .55 + .45 * max(normal.y, 0.) + .15 * abs(normal.x);
   vec3 col = aPart > .5
-    ? head * lightRamp(.62 + .15 * uLight + .08 * min(head, 1.)) * 1.2 * face
-    : lightRamp(mix(.429, .286, aSeed)) * .2 * face;
-  vColor = fogged(col * uDim, wp);
+    ? head * lightRamp(.62 + .15 * uLight + .08 * min(head, 1.)) * 1.2 * face * (1. - .4 * rest)
+    : lightRamp(mix(.429, .286, aSeed)) * .2 * face * (1. - .6 * rest);
+  // Resting walkers are cooled marks, not lamps: the lying foot sinks toward the ink, the head glows low.
+  vColor = fogged(col * uDim * (.4 + .6 * nf) * step(1e-4, nf), wp);
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.);
 }`;
 const colorFragment = `
@@ -53,7 +68,7 @@ varying vec2 vUv;
 varying float vSpark;
 ${POSE_GLSL}
 void main() {
-  float spark = aP1.w * aP1.y;
+  float spark = aP1.w * aP1.y * nearFade(swelled(aP0.xyz));
   vec3 p = swelled(aP0.xyz) + vec3(0., .9 + 1.5 * (1. - spark), 0.);
   vec4 mv = viewMatrix * vec4(p, 1.);
   mv.xy += position.xy * .16 * step(.001, spark);
@@ -74,9 +89,10 @@ varying float vHead;
 ${POSE_GLSL}
 void main() {
   vec3 p = swelled(aP0.xyz) + vec3(0., .54 * aP1.y, 0.);
+  float nf = nearFade(swelled(aP0.xyz));
   vec4 mv = viewMatrix * vec4(p, 1.);
-  mv.xy += position.xy * .7 * aP1.y;
-  vUv = position.xy * 2.; vHead = aP1.z;
+  mv.xy += position.xy * .7 * aP1.y * nf;
+  vUv = position.xy * 2.; vHead = aP1.z * nf;
   gl_Position = projectionMatrix * mv;
 }`;
 const emberFragment = `
@@ -106,7 +122,7 @@ function walkerBody() {
 }
 
 /** Walkers (§2.5): one instanced draw (bodies or ember sprites) plus one for hat sparks, fed by posesAt in a layout effect. */
-export const Walkers = ({t, world, look = 'walker', max = WALKERS, light, dim = 1, fog = DEFAULT_FOG, swellGain = 0}: WalkersProps) => {
+export const Walkers = ({t, world, look = 'walker', max = WALKERS, light, dim = 1, fog = DEFAULT_FOG, swellGain = 0, near = NEAR}: WalkersProps) => {
   const w = useWorld();
   const {buffer, body, sprites, sparks} = useMemo(() => {
     const buffer = new THREE.InstancedInterleavedBuffer(new Float32Array(w.walkers.count * POSE), POSE).setUsage(THREE.DynamicDrawUsage);
@@ -122,7 +138,7 @@ export const Walkers = ({t, world, look = 'walker', max = WALKERS, light, dim = 
     return {buffer, body, sprites: quad(), sparks: quad()};
   }, [w]);
   useEffect(() => () => {body.dispose(); sprites.dispose(); sparks.dispose();}, [body, sprites, sparks]);
-  const u0 = () => uniforms({uSwell: new THREE.Vector3(), uLight: 0, uDim: 1, uFogDensity: 0, uFogColor: new THREE.Color()});
+  const u0 = () => uniforms({uSwell: new THREE.Vector3(), uNear: new THREE.Vector2(...NEAR), uLight: 0, uDim: 1, uFogDensity: 0, uFogColor: new THREE.Color()});
   const bodyMaterial = useShader(() => new THREE.ShaderMaterial({vertexShader: bodyVertex, fragmentShader: colorFragment, uniforms: u0()}));
   const additive = {transparent: true, depthWrite: false, blending: THREE.AdditiveBlending} as const;
   const emberMaterial = useShader(() => new THREE.ShaderMaterial({vertexShader: emberVertex, fragmentShader: emberFragment, uniforms: u0(), ...additive}));
@@ -134,9 +150,9 @@ export const Walkers = ({t, world, look = 'walker', max = WALKERS, light, dim = 
     for (const m of [bodyMaterial, emberMaterial, sparkMaterial]) {
       const u = m.uniforms;
       u.uSwell.value.set(world.swell.center[0], world.swell.center[2], world.swell.amp * swellGain);
-      u.uLight.value = light; u.uDim.value = dim; u.uFogDensity.value = fog.density; u.uFogColor.value.setRGB(...fog.color);
+      u.uLight.value = light; u.uDim.value = dim; u.uNear.value.set(near[0], near[1]); u.uFogDensity.value = fog.density; u.uFogColor.value.setRGB(...fog.color);
     }
-  }, [w, buffer, body, sprites, sparks, bodyMaterial, emberMaterial, sparkMaterial, t, world, max, light, dim, fog, swellGain]);
+  }, [w, buffer, body, sprites, sparks, bodyMaterial, emberMaterial, sparkMaterial, t, world, max, light, dim, fog, swellGain, near[0], near[1]]);
   return <>
     {look === 'ember'
       ? <mesh geometry={sprites} material={emberMaterial} frustumCulled={false}/>

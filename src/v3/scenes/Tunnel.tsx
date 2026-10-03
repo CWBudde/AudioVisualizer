@@ -99,8 +99,9 @@ void main() {
   // M6 hammer: crimson → amber flashes, strongest on the walls just ahead of Wick.
   float hit = step(.4, fract(vHash * 3.71 + uHitN * .382)), ahead = smoothstep(-6., 4., vArc - uA) * (1. - smoothstep(18., 30., vArc - uA));
   col += mix(P_CRIMSON, P_AMBER, .35 + .3 * rim) * 1.6 * uHammer * hit * (.25 + .75 * ahead) * (.5 + .5 * rim);
-  // B7 pulse (§2.6, ×(1 + 2·pulse) tinted crimson): the faces fill with crimson, the rims burn hotter.
-  col = col * (1. + uPulse) + P_CRIMSON * uPulse * (.25 + .9 * rim);
+  // B7 pulse (§2.6, ×(1 + 2·pulse) tinted crimson): the faces fill with crimson, the rims burn hotter. The gain is
+  // red-weighted and the wash kept below ACES's shoulder: the purple ink plus a hot crimson read pink after tone mapping.
+  col = col * (1. + uPulse * vec3(.7, .05, 0.)) + P_CRIMSON * uPulse * (.2 + .25 * rim);
   float dist = length(vPos - cameraPosition), fog = exp(-pow(uFogDensity * dist, 2.));
   if (dist < .6) discard; // the chase grazes the outer U wall near arc 246: never a near-plane slab
   gl_FragColor = vec4(mix(uFogColor, col, fog), 1.);
@@ -139,7 +140,7 @@ const Walls = ({t, light, world, kick, kickCount}: WallProps) => {
     let hitN = 0;
     for (const m of w.m6) hitN += lastAtOrBefore(m.hits, t) + 1;
     u.uT.value = t; u.uA.value = world.arc; u.uPart.value = smoothstep(54, 55.5, t); u.uSink.value = smoothstep(54.2, 57.3, t);
-    u.uWick.value.set(wick.p[0], wick.y + .5, wick.p[2]); u.uWickGlow.value = wick.glow; u.uLight.value = light;
+    u.uWick.value.set(wick.p[0], wick.y + .3, wick.p[2]); u.uWickGlow.value = wick.glow; u.uLight.value = light;
     u.uBar22.value = smoothstep(50.25, 50.4, t) * (1 - smoothstep(52.5, 52.65, t));
     u.uKick.value = kick; u.uKickN.value = kickCount; u.uStep.value = Math.floor((t - 50.324) / .142857);
     u.uHammer.value = world.hammer; u.uHitN.value = hitN; u.uPulse.value = world.shadow.pulse;
@@ -160,7 +161,8 @@ const Tunnel = (p: SceneProps) => {
     <Backdrop light={light} glow={.12 + world.horizon.glow} center={camera(p).position} tint={world.horizon.tint} shadow={world.shadow.sky}/>
     <Plain t={t} light={light} world={world} floor={.6} swellGain={1} fog={FOG}/>
     <Walls t={t} light={light} world={world} kick={c.kick} kickCount={c.kickCount}/>
-    <Walkers t={t} world={world} max={200} light={light}/>
+    {/* The chase rides inside the line: walkers beside the lens shrink to their size 7 tiles out (no blocks at the frame edges). */}
+    <Walkers t={t} world={world} max={200} light={light} near={[2, 7]}/>
     <Wick world={world} light={light}/>
     <GhostLantern world={world} light={light}/>
     <HeraldBeams world={world}/>

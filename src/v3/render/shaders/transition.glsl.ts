@@ -33,9 +33,11 @@ void main() {
     float m = .55 * n + .45 * clamp(length(vUv - uCenter) / .9, 0., 1.);
     float d = m - mix(-.2, 1.2, p);
     col = mix(b, a * mix(.25, 1., smoothstep(0., .14, d)), smoothstep(-.012, .012, d));
-    // Rim about 6 px wide on screen whatever the front's slope (the radial term makes m shallow), hot only on its core.
-    float w = max(fwidth(d), 1e-4), rim = exp(-abs(d) / (3. * w));
-    col += mix(P_RED, P_AMBER, exp(-abs(d) / w)) * rim * 1.4 * ends;
+    // A thin fiery edge (a few px whatever the front's slope; the radial term makes m shallow): a hot amber→yellow core
+    // that flickers along the front, and a low red ember fringe on the unburnt side, kept under the bloom threshold.
+    float w = max(fwidth(d), 1e-4), flick = .2 + 2.4 * pow(fbm(vUv * 26. + vec2(p * 4.1, uSeed * 17.)), 2.);
+    float core = exp(-abs(d) / (1.3 * w)), fringe = step(0., d) * exp(-max(d, 0.) / (5. * w)); // max: exp of −d/w overflows to inf, and 0 · inf is NaN (black)
+    col += (mix(P_ORANGE, P_YELLOW, core) * core * flick + P_RED * fringe * .3 * (.5 + .5 * flick)) * ends;
   } else if (uKind == 2) {
     // Wash: warm light floods the frame at the midpoint and recedes onto B.
     float flood = pow(sin(3.14159265 * p), 2.);
@@ -45,7 +47,7 @@ void main() {
     // with the anchor's inradius .25; p³ (§5 says p²) keeps the whole crest silhouette on screen at the midpoint. d in UV units.
     float s = max(12. * p * p * p, 1e-4), d = crestSdf((vUv - uCenter) * 2. / s + ANCHOR) * s / 2.;
     col = mix(a, b, smoothstep(.004, -.004, d) * smoothstep(0., .02, p));
-    col += mix(P_ORANGE, P_AMBER, exp(-abs(d) / .004)) * exp(-abs(d) / .015) * 1.6 * ends;
+    col += mix(P_ORANGE, P_AMBER, exp(-abs(d) / .004)) * exp(-abs(d) / .009) * 1.3 * ends;
   }
   o = vec4(max(col, 0.), 1.);
 }`;

@@ -115,7 +115,8 @@ function pose(w: World, c: Consts, f: Frame, k: number, out: Float32Array | numb
   }
   // 3. Stand-up (the pop hides under a head flash); at the rise everyone sits up the last half over 4 frames.
   const wake = W.wake[k];
-  let stand = co === 2 ? 1 : ss(wake - 1e-6, wake + POP, tau), head = 1 + 1.5 * Math.exp(-(tau - wake) / .2);
+  // The 2,048-strong rise flashes softer than the trail's: summed over the plain it would blow out the 64.04 iris.
+  let stand = co === 2 ? 1 : ss(wake - 1e-6, wake + POP, tau), head = 1 + (co === 2 && wake === WT.rise ? .4 : 1.5) * Math.exp(-(tau - wake) / .2);
   let lie = tau >= WT.rise ? .5 * (1 - ss(WT.rise, WT.rise + POP, tau)) : 0;
   // 4. March arc.
   let s: number, l: number, b: number;
