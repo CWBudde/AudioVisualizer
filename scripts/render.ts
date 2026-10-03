@@ -15,13 +15,17 @@ import {pathsFor, versionFromEnv} from './version';
 const mode = process.argv[2] ?? 'stills';
 if (!['preview', 'stills'].includes(mode)) throw new Error('Use preview or stills');
 const version = versionFromEnv(), paths = pathsFor(version);
+// PP_WORKSPACE isolates the bundle and stills of concurrent look-dev runs.
+const workspace = process.env.PP_WORKSPACE;
+if (workspace && !/^[\w-]+$/.test(workspace)) throw new Error('PP_WORKSPACE must be a plain name');
+if (workspace) paths.stills = `${paths.stills}/${workspace}`;
 await mkdir(paths.previews, {recursive: true});
 await mkdir(paths.stills, {recursive: true});
 await mkdir(paths.analysis, {recursive: true});
 const stillPath = (frame: number) => `${paths.stills}/${String(frame).padStart(4, '0')}.png`;
 let progress = -1;
 console.log(`Bundling PixelParade ${version}…`);
-const serveUrl = await bundle({entryPoint: 'src/index.ts', outDir: resolve('.cache/remotion-bundle'), onProgress: p => {const bucket = Math.floor(p / 25); if (bucket > progress) {console.log(`Bundle ${p}%`); progress = bucket;}}});
+const serveUrl = await bundle({entryPoint: 'src/index.ts', outDir: resolve(workspace ? `.cache/remotion-bundle-${workspace}` : '.cache/remotion-bundle'), onProgress: p => {const bucket = Math.floor(p / 25); if (bucket > progress) {console.log(`Bundle ${p}%`); progress = bucket;}}});
 await ensureBrowser();
 // The scene is WebGL2; ANGLE gives headless Chrome a GPU-backed context on macOS and Linux.
 const chromiumOptions = {gl: 'angle'} as const;
