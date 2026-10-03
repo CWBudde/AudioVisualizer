@@ -12,11 +12,9 @@ replace github.com/cwbudde/algo-vecmath => ../algo-vecmath
 
 replace github.com/cwbudde/wav => ../wav
 
-replace github.com/cwbudde/midi => ../midi
-
 require (
 	github.com/cwbudde/algo-dsp v0.0.0-00010101000000-000000000000
-	github.com/cwbudde/midi v0.0.0-00010101000000-000000000000
+	github.com/cwbudde/midi v0.1.0
 	github.com/cwbudde/wav v0.0.0-00010101000000-000000000000
 )
 
