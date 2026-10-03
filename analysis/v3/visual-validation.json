@@ -8,7 +8,82 @@
   "eventsChecked": 233,
   "notesChecked": 515,
   "silenceSuppression": "passed",
-  "timeline": {
+  "story": "public/analysis/story.json",
+  "bars": 38,
+  "leitmotifs": [
+    {
+      "id": "M1",
+      "role": "ostinato",
+      "occurrences": 9
+    },
+    {
+      "id": "M2",
+      "role": "ostinato",
+      "occurrences": 5
+    },
+    {
+      "id": "M4",
+      "role": "theme",
+      "occurrences": 3
+    },
+    {
+      "id": "M5",
+      "role": "ostinato",
+      "occurrences": 8
+    }
+  ],
+  "1 route": {
+    "vertices": 25,
+    "headingError": 2.220446049250313e-16
+  },
+  "2 wick": {
+    "boundaries": [
+      0,
+      46,
+      100,
+      202,
+      244,
+      292,
+      328,
+      429.7
+    ]
+  },
+  "3+4 walkers": {
+    "maxStep": 1.427,
+    "counts": {
+      "600": {
+        "visible": 86,
+        "lying": 0,
+        "standing": 86
+      },
+      "1110": {
+        "visible": 200,
+        "lying": 0,
+        "standing": 200
+      },
+      "2800": {
+        "visible": 200,
+        "lying": 0,
+        "standing": 200
+      },
+      "3500": {
+        "visible": 2048,
+        "lying": 2048,
+        "standing": 0
+      },
+      "3900": {
+        "visible": 2048,
+        "lying": 0,
+        "standing": 2048
+      }
+    }
+  },
+  "5 tiles": {
+    "fullCells": 7,
+    "maxPerCell": 8,
+    "answers": 1
+  },
+  "6 timeline": {
     "entries": 8,
     "kinds": [
       "iris",
@@ -61,31 +136,10 @@
       }
     ]
   },
-  "story": "public/analysis/story.json",
-  "bars": 38,
-  "leitmotifs": [
-    {
-      "id": "M1",
-      "role": "ostinato",
-      "occurrences": 9
-    },
-    {
-      "id": "M2",
-      "role": "ostinato",
-      "occurrences": 5
-    },
-    {
-      "id": "M4",
-      "role": "theme",
-      "occurrences": 3
-    },
-    {
-      "id": "M5",
-      "role": "ostinato",
-      "occurrences": 8
-    }
-  ],
-  "deterministicSeeks": "passed",
-  "finiteFrameState": "passed",
-  "forbiddenTokens": "none"
+  "7 frame state": {
+    "closestCamera": 7.179,
+    "worstDirY": 0.9935
+  },
+  "8 determinism": "seeks passed; repeat-still hashes run in render:stills",
+  "forbiddenTokens": "none in 44 files"
 }

@@ -4,10 +4,11 @@ import type {SceneId} from '../scenes/registry';
 import {occurrenceProgress, recentOccurrences, storyAt} from '../story';
 import type {Story, StoryAt} from '../story';
 import {FLASHES, LEGATO, LIGHT, TIMELINE} from '../timeline';
+import {ANCHOR, CREST_HALF} from '../render/shaders/crest.glsl';
 import {buildWorld, worldAt} from '../world';
-import type {WorldFrame} from '../world';
+import type {World, WorldFrame} from '../world';
 import {clamp, ease, lerp, smoothstep} from './easing';
-import {resolveRef, songEnd} from './time';
+import {resolveRef} from './time';
 import {activeScenes, resolveTimeline, TRANSITION_KINDS} from './timeline';
 import type {Entry, Phase, ResolvedScene, TransitionKind} from './timeline';
 import type {TimeRef} from './time';
@@ -33,11 +34,14 @@ export type TransitionState = {count: number; kind: TransitionKind; kindIndex: n
 /**
  * The persistent motif glyph, in NDC (y up). rings: up to 4 recent flares as [age s, strength], age -1 when unused.
  * Crest (§2.3): columns = 12 per-column flares; legato λ 0–1; width = column width share of its cell; dot 1 draws the
- * single-pixel freeze dot; offset = crest height above Wick's head in crest units (1, → 0 at the landing).
+ * single-pixel freeze dot (0–1, blends crest → dot); offset 1 = crest above Wick's head, → 0 as it drops onto Wick at the landing.
+ * center is the crest ANCHOR point in NDC; a screen point maps to crest coordinates as (ndc − center) / scale + ANCHOR.
  */
 export type MotifState = {
   center: Vec2; scale: number; glow: number; morph: number; heat: number; pulse: number; growth: number; rings: number[];
   columns: number[]; legato: number; width: number; dot: number; offset: number;
+  /** Crest ember sparkle 0–1 (only while λ > .5; off from 82.35). */
+  embers: number;
 };
 /** flash: global warm flash strength (FLASHES); flashTone: its light-ramp position. */
 export type PostState = {light: number; exposure: number; bloom: number; saturation: number; grain: number; aberration: number; vignette: number; frame: number; flash: number; flashTone: number};
@@ -69,49 +73,89 @@ export function flashAt(t: number) {
   return {flash, flashTone};
 }
 
-function motifState(a: Analysis, story: Story, at: StoryAt, c: AudioControls, t: number, light: number, world: WorldFrame): MotifState {
-  const {seen, total} = occurrenceProgress(story, t);
-  // Without leitmotifs the glyph follows the melody's freshest note instead.
-  const flare = Object.values(at.motifs).reduce((m, x) => Math.max(m, x.pulse), 0);
-  const note = c.notes.reduce((m, n) => Math.max(m, n.strength * Math.exp(-n.startAge / .25)), 0);
-  const p = total ? flare : .35 * note;
-  const growth = total ? seen / total : clamp(t / 86.12);
-  const rings = recentOccurrences(story, t, RINGS, 2.5).flatMap(o => [o.age, clamp(o.similarity) / Math.max(1, o.rank)]);
-  while (rings.length < RINGS * 2) rings.push(-1, 0);
-  return {
-    center: [.16 * Math.sin(.13 * t + .7), -.06 + .1 * Math.sin(.083 * t)],
-    scale: .045 + .02 * p + .02 * light, glow: (.35 + 1.4 * light) * (.6 + .4 * growth) + 2.5 * p,
-    morph: clamp(.1 + .9 * growth), heat: clamp(.15 + .35 * growth + .35 * light + .25 * p), pulse: p, growth, rings,
-    // STUB (Phase 0) crest fields, WP5 replaces: columns are all 0, dot follows freezes 1 and 3 outright.
-    ...crestStub(a, t, world),
-  };
+/** NDC (square aspect) of world point x through pose, as the compositor applies it: lookAt with up +Y, then roll about the view axis. */
+export function projectNdc(pose: CameraPose, x: Vec3): Vec2 {
+  const [px, py, pz] = pose.position, [tx, ty, tz] = pose.target;
+  let fx = tx - px, fy = ty - py, fz = tz - pz;
+  const fn = Math.hypot(fx, fy, fz) || 1; fx /= fn; fy /= fn; fz /= fn;
+  // right = f × Y, up = right × f.
+  let rx = -fz, rz = fx;
+  const rn = Math.hypot(rx, rz) || 1; rx /= rn; rz /= rn;
+  const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy;
+  const dx = x[0] - px, dy = x[1] - py, dz = x[2] - pz;
+  const cx = dx * rx + dz * rz, cy = dx * ux + dy * uy + dz * uz, cz = Math.max(dx * fx + dy * fy + dz * fz, .05);
+  const c = Math.cos(pose.roll), s = Math.sin(pose.roll), k = 1 / (cz * Math.tan(pose.fov / 2 * Math.PI / 180));
+  return [clamp((cx * c + cy * s) * k, -1.5, 1.5), clamp((-cx * s + cy * c) * k, -1.5, 1.5)];
 }
 
-function crestStub(a: Analysis, t: number, world: WorldFrame) {
-  const legato = keyedAt(a, LEGATO, t);
-  return {columns: Array<number>(12).fill(0), legato, width: lerp(.5, .9, legato), dot: world.frozen && (t < 9.1685 || t >= 63.615) ? 1 : 0, offset: 1 - smoothstep(84.615, 84.9, t)};
+/** Index of the first sorted time > t. */
+const upperBound = (times: ArrayLike<number>, t: number) => {
+  let lo = 0, hi = times.length;
+  while (lo < hi) {const mid = (lo + hi) >> 1; if (times[mid] <= t) lo = mid + 1; else hi = mid;}
+  return lo;
+};
+/** Per-column crest flares (§2.3): the strongest recent lead note under each column, staccato → legato by λ. Motion: evaluated at held τ. */
+function crestColumns(w: World, tau: number, legato: number) {
+  const columns = Array<number>(12).fill(0);
+  for (let i = upperBound(w.noteStart, tau) - 1; i >= 0 && w.noteStart[i] >= tau - 1.5; i--) {
+    const age = tau - w.noteStart[i], dur = w.noteEnd[i] - w.noteStart[i];
+    const stacc = Math.exp(-age / .09), leg = age < dur ? 1 : Math.exp(-(age - dur) / .25);
+    const v = (w.noteVel[i] / 127) ** .7 * lerp(stacc, leg, legato) * (w.noteMotif[i] === 1 ? 1 : .7), k = w.noteCol[i];
+    if (v > columns[k]) columns[k] = v;
+  }
+  return columns;
+}
+/** The 1-px freeze shrink of freezes 1 and 3 (4 frames in, restored over the iris that follows). */
+export const crestShrink = (t: number) =>
+  smoothstep(8.746, 8.813, t) * (1 - smoothstep(9.1685, 9.6185, t)) + smoothstep(63.615, 63.682, t) * (1 - smoothstep(64.038, 64.388, t));
+
+/**
+ * Wick's crest on the motif layer (§2.3). center is the crest ANCHOR in NDC: the crest base sits .012 above Wick's head as
+ * projected through the layer camera(s) (mixed by the eased transition progress); at the landing (offset → 0) the crest
+ * drops so its lower-right end — where the route ends on the giant crest — sits on Wick.
+ */
+function motifState(a: Analysis, w: World, story: Story, t: number, light: number, world: WorldFrame, layers: Layer[], mix: number): MotifState {
+  const tau = world.held, legato = keyedAt(a, LEGATO, t), columns = crestColumns(w, tau, legato);
+  const shrink = crestShrink(t), offset = 1 - smoothstep(84.615, 84.9, t);
+  const scale = lerp(lerp(.05, .08, smoothstep(64.038, 66.324, t)), .004, shrink);
+  const {p, y, scale: ws} = world.wick, head: Vec3 = [p[0], y + lerp(.4, 1, offset) * ws, p[2]];
+  const h0 = projectNdc(layers[0].camera, head), h1 = layers[1] ? projectNdc(layers[1].camera, head) : h0;
+  const base: Vec2 = [lerp(h0[0], h1[0], mix), lerp(h0[1], h1[1], mix) + .012 * offset];
+  const q0: Vec2 = [(1 - offset) * CREST_HALF, (1 - offset) * 3 / 84];
+  const center: Vec2 = [base[0] + (ANCHOR[0] - q0[0]) * scale, base[1] + (ANCHOR[1] - q0[1]) * scale];
+  const {seen, total} = occurrenceProgress(story, tau), growth = total ? seen / total : clamp(t / 86.12);
+  // Rings only from M4 and M5 (loop ring and herald), crest-shaped, at ×.6; gone after the collapse so only the giant crest
+  // and the small one on Wick share the reveal.
+  const ringGain = .6 * (1 - smoothstep(82.35, 82.9, t));
+  const rings = recentOccurrences(story, tau, 16, 2.5).filter(o => o.id === 'M4' || o.id === 'M5').slice(0, RINGS).flatMap(o => [o.age, ringGain * clamp(o.similarity || 1)]);
+  while (rings.length < RINGS * 2) rings.push(-1, 0);
+  const pulse = Math.max(...columns);
+  return {
+    // Through the release the crest sinks into Wick's ember, so one ember survives the fade to ink.
+    center, scale, glow: (.6 + 1.2 * light) * world.wick.glow * (1 - .85 * smoothstep(85.73, 86.05, t)), morph: clamp(.1 + .9 * growth), heat: clamp(.15 + .35 * growth + .35 * light + .25 * pulse), pulse, growth, rings,
+    columns, legato, width: lerp(.5, .9, legato), dot: shrink, offset, embers: smoothstep(.5, .65, legato) * world.sparkle,
+  };
 }
 
 /** One frame of v3 as a pure function of time: called outside the canvas and by validation. */
 export function v3Frame(a: Analysis, story: Story, t: number, frame: number, scenes: SceneCameras, entries: readonly Entry[] = TIMELINE): FrameState {
-  const c = getAudioControls(a, t), at = storyAt(story, t), light = lightAt(a, t), world = worldAt(buildWorld(a, story), a, t);
+  const c = getAudioControls(a, t), at = storyAt(story, t), light = lightAt(a, t), w = buildWorld(a, story), world = worldAt(w, a, t);
   const layers = activeScenes(resolveTimeline(a, entries), t).map(({scene, presence, phase}): Layer => {
     const props: SceneProps = {t, local: t - scene.start, duration: scene.end - scene.start, presence, phase, controls: c, story: at, seed: scene.seed, visit: scene.visit, light, world};
     return {scene, props, camera: scenes[scene.id].camera(props)};
   });
-  const motifs = motifState(a, story, at, c, t, light, world);
   const incoming = layers[1]?.scene;
-  const kind = incoming?.transition ?? 'dissolve';
+  const kind = incoming?.transition ?? 'dissolve', progress = incoming ? clamp((t - incoming.start) / incoming.fadeIn) : 0;
+  const motifs = motifState(a, w, story, t, light, world, layers, ease(progress));
   const transition: TransitionState = {
-    count: layers.length, kind, kindIndex: TRANSITION_KINDS.indexOf(kind),
-    progress: incoming ? clamp((t - incoming.start) / incoming.fadeIn) : 0, seed: (incoming?.seed ?? 0) % 1000 / 1000,
+    count: layers.length, kind, kindIndex: TRANSITION_KINDS.indexOf(kind), progress, seed: (incoming?.seed ?? 0) % 1000 / 1000,
     center: [(motifs.center[0] + 1) / 2, (motifs.center[1] + 1) / 2], wash: .15 + .45 * light,
   };
-  const end = songEnd(a);
   return {
     t, frame, controls: c, story: at, world, layers, transition, motifs,
     post: {
-      light, exposure: (.1 + .9 * ease(t / 1.2)) * (1 - ease((t - (end - 1.5)) / 1.5)),
+      // Ends on an ink glow at 18 % (Wick's ember stays readable), not black.
+      light, exposure: (.1 + .9 * ease(t / 1.2)) * (1 - .82 * ease((t - 85.73) / .32)),
       bloom: .7 + .5 * light + .25 * c.kick, saturation: 1.05, grain: .035 + .03 * c.hat, aberration: .15 + .3 * c.kick, vignette: .55, frame,
       ...flashAt(t),
     },

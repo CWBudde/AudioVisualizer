@@ -13,3 +13,9 @@ export {VERTICES, routeCrisp} from './route';
 export {camArc, isFrozen} from './clock';
 export {POSE, WALKERS} from './poses';
 export {move} from './rigs';
+// WP1 additions: a single walker's pose, the walker story's key times, non-allocating route frame, causeway step heights,
+// the tile event report (for validation) and its kinds/cell helpers.
+export {walkerPose, WT, REST_LIGHT} from './poses';
+export {routeFrameInto, causewaySteps} from './route';
+export {tileReport, EVENT, cellOf, TILES} from './tiles';
+export type {TileReport, TileSource} from './tiles';

@@ -24,6 +24,10 @@ await mkdir(paths.stills, {recursive: true});
 await mkdir(paths.analysis, {recursive: true});
 const stillPath = (frame: number) => `${paths.stills}/${String(frame).padStart(4, '0')}.png`;
 let progress = -1;
+// v3: the docs/v3/script.md §7.2 stills, plus 180 and 2400 for the repeat-hash check and 2340 / 2580 where the drift climb and
+// the B7 rise have actually happened (2330 and 2500 land just before them); transition midpoints are added below.
+const V3_STILLS = [30, 180, 300, 500, 540, 563, 700, 900, 1022, 1090, 1120, 1150, 1237, 1800, 2075, 2143, 2250, 2330, 2340, 2400, 2500, 2580, 2660,
+  2734, 2790, 2890, 3050, 3180, 3240, 3366, 3450, 3620, 3780, 3830, 3853, 3900, 4000, 4314, 4350, 4420, 4800, 4900, 4930, 4960, 5040, 5080, 5120, 5160];
 console.log(`Bundling PixelParade ${version}…`);
 const serveUrl = await bundle({entryPoint: 'src/index.ts', outDir: resolve(workspace ? `.cache/remotion-bundle-${workspace}` : '.cache/remotion-bundle'), onProgress: p => {const bucket = Math.floor(p / 25); if (bucket > progress) {console.log(`Bundle ${p}%`); progress = bucket;}}});
 await ensureBrowser();
@@ -39,7 +43,7 @@ try {
     for (const frame of requested) {console.log(`Still ${frame} (${(frame / 60).toFixed(2)}s)`); await renderStill({...common, frame, output: stillPath(frame)});}
   } else if (mode === 'stills') {
     // Cue edges and in-cue changes: 0, 8.75, 9.17, 18.05, 18.31, 27.43, 36.6, 44.4, 45.7, 54.9, 62.3, 64, 73.14, 82.3, end.
-    const frames = [0, 180, 525, 550, 720, 1083, 1099, 1646, 1800, 2196, 2400, 2664, 2742, 2850, 3294, 3738, 3840, 3900, 4388, 4620, 4938, 5100, 5167];
+    const frames = version === 'v3' ? [...V3_STILLS] : [0, 180, 525, 550, 720, 1083, 1099, 1646, 1800, 2196, 2400, 2664, 2742, 2850, 3294, 3738, 3840, 3900, 4388, 4620, 4938, 5100, 5167];
     if (version === 'v3') {
       // Transition midpoints are where hard cuts, black layers or broken blends would show.
       const a: Analysis = JSON.parse(await readFile('public/analysis/controls.json', 'utf8'));
@@ -55,6 +59,10 @@ try {
       await writeFile(`${paths.analysis}/still-luma.json`, JSON.stringify(luma, null, 2));
       const dark = frames.filter(f => f >= 10 * FPS && f <= 80 * FPS && luma[f] < 2);
       if (dark.length) throw new Error(`Blank captures (YAVG < 2) at frames ${dark.join(', ')}`);
+      // The film ends on ink with one ember (§7.2 f5160); drift and freeze 3 aim for YAVG ≥ 5 (design target: warn only).
+      if (luma[5160] >= 4) throw new Error(`Ending too bright: YAVG ${luma[5160].toFixed(2)} at frame 5160 (must be < 4)`);
+      const dim = [2250, 2340, 2580, 2660, 3830].filter(f => luma[f] < 5);
+      if (dim.length) console.warn(`Below the YAVG 5 design target: ${dim.map(f => `${f} (${luma[f].toFixed(2)})`).join(', ')}`);
     }
     const hashes: Record<string, string> = {};
     // Render in a different order, compare actual captured pixels, not just poses.

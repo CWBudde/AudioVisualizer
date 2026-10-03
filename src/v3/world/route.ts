@@ -51,14 +51,22 @@ function smoothTable() {
   }
   return table = {p, h};
 }
-/** Smoothed route frame at arc s: formations and cameras use this so nothing snaps at the 90° corners. */
-export function routeFrame(s: number): Frame3 {
+/** Smoothed frame without allocating: writes [px, pz, hx, hz] into out (r = (−hz, hx)). For per-walker loops. */
+export function routeFrameInto(s: number, out: Float64Array | number[]) {
   const {p, h} = smoothTable();
   const x = Math.min(Math.max((s - S0) / STEP, 0), N - 1), i = Math.min(Math.floor(x), N - 2), k = x - i, over = s - Math.min(Math.max(s, S0), S1);
-  const at = (a: Float64Array, c: number) => a[i * 3 + c] + (a[(i + 1) * 3 + c] - a[i * 3 + c]) * k;
-  const hx = at(h, 0), hz = at(h, 2), n = Math.hypot(hx, hz), dir: Vec3 = [hx / n, 0, hz / n];
+  const i0 = i * 3, i1 = i0 + 3;
+  const hx = h[i0] + (h[i1] - h[i0]) * k, hz = h[i0 + 2] + (h[i1 + 2] - h[i0 + 2]) * k, n = Math.hypot(hx, hz);
+  out[2] = hx / n; out[3] = hz / n;
   // Outside the table: extrapolate along the end heading.
-  return {p: [at(p, 0) + dir[0] * over, 0, at(p, 2) + dir[2] * over], h: dir, r: rightOf(dir)};
+  out[0] = p[i0] + (p[i1] - p[i0]) * k + out[2] * over; out[1] = p[i0 + 2] + (p[i1 + 2] - p[i0 + 2]) * k + out[3] * over;
+  return out;
+}
+const scratch = new Float64Array(4);
+/** Smoothed route frame at arc s: formations and cameras use this so nothing snaps at the 90° corners. */
+export function routeFrame(s: number): Frame3 {
+  const [px, pz, hx, hz] = routeFrameInto(s, scratch), dir: Vec3 = [hx, 0, hz];
+  return {p: [px, 0, pz], h: dir, r: rightOf(dir)};
 }
 
 /** The causeway stair (§2.2): seven .4 steps from arc 375 rising just before each note of the 72.0–73.2 run, lowered over 82.35–84.0. */
@@ -70,4 +78,10 @@ export function causewayY(w: World, s: number, t: number) {
     y += .4 * smoothstep(T - .12, T, t);
   }
   return y * (1 - smoothstep(82.35, 84, t));
+}
+/** The seven causeway step heights at t (step j covers arc ≥ 375 + j); causewayY(s) = Σ steps with s ≥ 375 + j. */
+export function causewaySteps<T extends Float32Array | number[]>(w: World, t: number, out: T): T {
+  const fall = 1 - smoothstep(82.35, 84, t);
+  for (let j = 0; j <= 6; j++) {const T = w.noteStart[375 + j]; out[j] = T === undefined ? 0 : .4 * smoothstep(T - .12, T, t) * fall;}
+  return out;
 }

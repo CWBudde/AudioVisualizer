@@ -6,7 +6,7 @@ import type {Rig, WorldFrame} from './types';
 
 export type RigName = 'dolly' | 'paradeHigh' | 'topDiag' | 'topDiagLow' | 'chase' | 'grandHigh' | 'grandCauseway';
 export const RIGS: Record<RigName, Rig> = {
-  dolly: {back: 1.5, side: -6.5, up: 1.4, ahead: 3, lift: .5, fov: 40},        // + .15 sin(.4t) bob, added by followRig
+  dolly: {back: 1.5, side: -6.5, up: 1.4, ahead: 1.5, lift: .5, fov: 40},      // + .15 sin(.4t) bob, added by followRig; ahead 1.5 (not 3) keeps Wick in frame (WP2-R2)
   paradeHigh: {back: 10, side: -8, up: 9, ahead: 5, lift: 0, fov: 45},
   topDiag: {back: 8, side: -8, up: 24, ahead: 4, lift: 0, fov: 42},
   topDiagLow: {back: 12, side: -9, up: 12, ahead: 6, lift: .5, fov: 44},

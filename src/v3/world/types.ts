@@ -26,6 +26,10 @@ export type World = {
   tiles: {size: 160; events: [Float32Array, Float32Array]; arc: Float32Array; lateral: Float32Array; crest: Uint8Array};
   answerHome: Vec3; answerMeet: Vec3;
   aRest: number; aRise: number;                    // A(54.9), A(64.038); Δ = aRise − aRest
+  // Additions by WP1 (briefing item 6): bass notes and chords (pedal, horizon tint), the drift orbit's start arc.
+  bassStart: Float64Array; bassEnd: Float64Array; bassMidi: Uint8Array;
+  chordStart: Float64Array; chordRoot: Uint8Array; // root pitch class (7 = G)
+  aDrift: number;                                  // camArc(36.6): Drift's orbit starts from routeFrame(aDrift)
 };
 /** Per-frame world state: numbers only (validation walks it with assertFinite). */
 export type WorldFrame = {

@@ -23,11 +23,11 @@ function createPipeline(gl: THREE.WebGLRenderer) {
   const geometry = fullscreenTriangle();
   const material = (fragmentShader: string, uniforms: Uniforms) => new THREE.RawShaderMaterial({glslVersion: THREE.GLSL3, vertexShader: FULLSCREEN, fragmentShader, uniforms, depthTest: false, depthWrite: false});
   const u = (value: unknown) => ({value});
-  const blend = material(TRANSITION, {uA: u(null), uB: u(null), uCount: u(1), uKind: u(0), uProgress: u(0), uSeed: u(0), uWash: u(0), uLight: u(0), uMorph: u(0), uCenter: u(new THREE.Vector2(.5, .5))});
+  const blend = material(TRANSITION, {uA: u(null), uB: u(null), uCount: u(1), uKind: u(0), uProgress: u(0), uSeed: u(0), uWash: u(0), uLight: u(0), uCenter: u(new THREE.Vector2(.5, .5))});
   const down = material(raw(DOWN), {uSrc: u(null), uDst: u(new THREE.Vector2()), uTexel: u(new THREE.Vector2()), uThreshold: u(0)});
   const up = material(raw(UP), {uSrc: u(null), uBase: u(null), uDst: u(new THREE.Vector2()), uTexel: u(new THREE.Vector2())});
   const composite = material(COMPOSITE, {uScene: u(targets.hdr.texture), uBloom: u(null), uRes: u(new THREE.Vector2(SIZE, SIZE)),
-    uBloomAmount: u(1), uAberration: u(0), uSaturation: u(1), uExposure: u(1), uGrain: u(0), uFrame: u(0), uVignette: u(0)});
+    uBloomAmount: u(1), uAberration: u(0), uSaturation: u(1), uExposure: u(1), uGrain: u(0), uFrame: u(0), uVignette: u(0), uFlash: u(0), uFlashTone: u(.714)});
   const quad = new THREE.Mesh(geometry, blend), quadScene = new THREE.Scene(), quadCamera = new THREE.Camera();
   quad.frustumCulled = false; quadScene.add(quad);
   const pass = (m: THREE.RawShaderMaterial, target: THREE.WebGLRenderTarget | null) => {
@@ -39,9 +39,10 @@ function createPipeline(gl: THREE.WebGLRenderer) {
     update(s: FrameState) {
       const b = blend.uniforms, tr = s.transition, p = s.post, c = composite.uniforms;
       b.uCount.value = tr.count; b.uKind.value = tr.kindIndex; b.uProgress.value = tr.progress; b.uSeed.value = tr.seed;
-      b.uWash.value = tr.wash; b.uLight.value = p.light; b.uMorph.value = s.motifs.morph; b.uCenter.value.set(...tr.center);
+      b.uWash.value = tr.wash; b.uLight.value = p.light; b.uCenter.value.set(...tr.center);
       c.uBloomAmount.value = p.bloom; c.uAberration.value = p.aberration; c.uSaturation.value = p.saturation;
       c.uExposure.value = p.exposure; c.uGrain.value = p.grain; c.uFrame.value = p.frame; c.uVignette.value = p.vignette;
+      c.uFlash.value = p.flash; c.uFlashTone.value = p.flashTone;
     },
     render(layers: Slot[], overlay: Slot) {
       layers.forEach((l, i) => {gl.setRenderTarget(targets.layers[i]); gl.render(l.scene, l.camera);});
@@ -103,6 +104,6 @@ export const Compositor = ({state, world}: {state: FrameState; world: World}) =>
       const {Component} = SCENES[l.scene.id];
       return <Fragment key={l.scene.id}>{createPortal(<WorldContext.Provider value={world}><Component {...l.props}/></WorldContext.Provider>, l.slot.scene)}</Fragment>;
     })}
-    {createPortal(<WorldContext.Provider value={world}><MotifLayer state={state.motifs} t={state.t} light={state.post.light}/></WorldContext.Provider>, motif.scene)}
+    {createPortal(<WorldContext.Provider value={world}><MotifLayer state={state.motifs} t={state.world.held} light={state.post.light}/></WorldContext.Provider>, motif.scene)}
   </>;
 };
